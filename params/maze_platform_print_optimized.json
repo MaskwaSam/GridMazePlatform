@@ -1,0 +1,19 @@
+{
+  "connector_thickness": 6.0,
+  "dovetail_length": 50.0,
+  "dovetail_neck_width": 22.0,
+  "dovetail_tail_width": 42.0,
+  "enabled_sides": [
+    "north",
+    "south",
+    "east",
+    "west"
+  ],
+  "fillet_radius": 1.2,
+  "mesh_tolerance": 0.05,
+  "pocket_clearance": 0.25,
+  "pocket_depth": 8.0,
+  "tile_height": 10.0,
+  "tile_size": 200.0,
+  "top_skin": 2.0
+}
