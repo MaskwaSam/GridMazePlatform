@@ -52,9 +52,10 @@
       </div>
 
       <div class="scene-wrap" id="scene-wrap">
-            <canvas id="maze-canvas" tabindex="0" aria-keyshortcuts="Control+R" aria-label="Interactive 3D maze with a 70 mm sphere robot. Its white band and orange marker rotate to show rolling. Drag it anywhere onto the highlighted blue starting piece. The release point becomes its starting position. Press Control plus R while focused to start rotating."></canvas>
+            <canvas id="maze-canvas" tabindex="0" aria-keyshortcuts="Control+R" aria-label="Interactive 3D maze with a 70 mm sphere robot. Its white band and orange marker rotate to show rolling. Drag it anywhere onto the highlighted blue starting piece. The release point becomes its starting position. N means North, or zero degrees, and marks the robot's initial forward direction. After the robot turns, forward follows its new facing. Press Control plus R while focused to start rotating."></canvas>
         <div class="scene-help" id="scene-help">
           <span aria-hidden="true">↔</span> Drop anywhere on the blue START piece. Your release point becomes the start.
+          <small><strong>N means North (0°).</strong> It is the robot’s starting forward direction. After a turn, forward follows its new facing.</small>
         </div>
         <div class="heading-key" aria-label="Robot-relative direction key"><span>FORWARD · 0°</span><span>RIGHT · +90°</span></div>
         <div class="loading-card" id="scene-loading" role="status">Loading maze pieces…</div>
@@ -158,7 +159,7 @@
   <noscript>This game requires JavaScript. Ask your teacher to enable JavaScript in Chrome.</noscript>
   <script>
     if ("serviceWorker" in navigator && location.protocol !== "file:") {
-      navigator.serviceWorker.register("./service-worker.js?v=32", { updateViaCache: "none" }).catch(() => {});
+      navigator.serviceWorker.register("./service-worker.js?v=33", { updateViaCache: "none" }).catch(() => {});
     }
   </script>
   <script type="module" src="./js/main.js?v=32"></script>

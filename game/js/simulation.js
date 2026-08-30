@@ -323,7 +323,7 @@ export class MazeSimulation {
     goalMarker.position.z = level.goal.z;
     group.add(startMarker, goalMarker);
 
-    const startLabel = createLabel("START AREA · N", "#ffffff", "#1479cc");
+    const startLabel = createLabel("START AREA · NORTH", "#ffffff", "#1479cc");
     startLabel.position.set(startTile.x, 92, startTile.z);
     const goalLabel = createLabel("STOP ON GOAL", "#ffffff", "#16845b");
     goalLabel.position.set(level.goal.x, 92, level.goal.z);

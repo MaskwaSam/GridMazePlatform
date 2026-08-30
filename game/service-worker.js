@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "maskwa-maze-lab-v32";
+const CACHE_NAME = "maskwa-maze-lab-v33";
 const APP_FILES = [
   "./",
   "./index.html",

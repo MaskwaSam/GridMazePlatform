@@ -39,7 +39,9 @@ origin. There are no CDN or external runtime requests.
 2. Drag the robot from its tray anywhere onto the highlighted blue START piece.
    The exact release point becomes that attempt's starting position. **Place at
    start center** remains an explicit shortcut. Every classroom level starts
-   facing north at world bearing `0°`.
+   facing north at world bearing `0°`. The `N` on the START AREA label means
+   North and marks the robot’s initial forward direction. After the robot turns,
+   its new facing becomes the reference for subsequent forward commands.
 3. Complete the deliberately unfinished starter blocks, or switch to Python.
 4. Press **Run**. **Stop** terminates the Python worker. **Reset** restores the
    exact position the student chose and clears the trail.

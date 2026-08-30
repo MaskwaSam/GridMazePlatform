@@ -884,7 +884,7 @@ function formatCoordinate(value) {
 
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
-  navigator.serviceWorker.register("./service-worker.js?v=32", { updateViaCache: "none" }).catch(() => {
+  navigator.serviceWorker.register("./service-worker.js?v=33", { updateViaCache: "none" }).catch(() => {
     appendLog("Offline cache is unavailable; the game still works while connected to this server.");
   });
 }

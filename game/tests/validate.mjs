@@ -102,6 +102,8 @@ test("HTML exposes the complete accessible game workflow", () => {
   assert.match(html, /Robot-relative direction key/);
   assert.match(html, /FORWARD · 0°/);
   assert.match(html, /Drop anywhere on the blue START piece/);
+  assert.match(html, /N means North \(0°\)/);
+  assert.match(html, /After a turn, forward follows its new facing/);
   assert.match(html, /70 mm sphere robot/);
   assert.match(html, /id="maze-canvas"[^>]+tabindex="0"/);
   assert.match(html, /id="maze-canvas"[^>]+aria-keyshortcuts="Control\+R"/);
@@ -582,10 +584,10 @@ test("the ordered catalogue, picker, next action, and offline cache cover every 
   const serviceWorker = read("service-worker.js");
   assert.match(main, /switchLevel/);
   assert.doesNotMatch(main, /fetch\("\.\/levels\/starter-l\.json"/);
-  assert.match(serviceWorker, /maskwa-maze-lab-v32/);
-  assert.match(main, /register\("\.\/service-worker\.js\?v=32", \{ updateViaCache: "none" \}\)/);
+  assert.match(serviceWorker, /maskwa-maze-lab-v33/);
+  assert.match(main, /register\("\.\/service-worker\.js\?v=33", \{ updateViaCache: "none" \}\)/);
   const html = read("index.html");
-  assert.match(html, /register\("\.\/service-worker\.js\?v=32", \{ updateViaCache: "none" \}\)/);
+  assert.match(html, /register\("\.\/service-worker\.js\?v=33", \{ updateViaCache: "none" \}\)/);
   assert.match(html, /src="\.\/js\/main\.js\?v=32"/);
   assert.match(main, /from "\.\/simulation\.js\?v=32"/);
   assert.match(main, /from "\.\/blocks\.js\?v=32"/);
@@ -679,6 +681,7 @@ const level = authoredLevels.find((candidate) => candidate.id === "starter-l");
 test("students can choose an exact collision-safe start anywhere on the first printable piece", () => {
   const simulation = read("js/simulation.js");
   const main = read("js/main.js");
+  assert.match(simulation, /createLabel\("START AREA · NORTH"/);
   for (const authored of authoredLevels) {
     const startTile = startTileForLevel(authored);
     assert.ok(startTile, `${authored.id}: missing starting piece`);
