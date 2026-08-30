@@ -1,0 +1,194 @@
+{
+  "schemaVersion": 2,
+  "id": "u-turn-trail",
+  "sequence": 5,
+  "name": "U-Turn Trail",
+  "description": "Use two right turns to travel around the long U-shaped route.",
+  "difficulty": "Beginning",
+  "concepts": [
+    "repeated turns",
+    "southbound travel"
+  ],
+  "units": "millimetres",
+  "tileSize": 200,
+  "baseTop": 10,
+  "robotDiameter": 70,
+  "robotRadius": 35,
+  "physics": {
+    "driveAcceleration": 900,
+    "brakeAcceleration": 900,
+    "coastDeceleration": 55,
+    "wallRestitution": 0.58,
+    "wallFriction": 0.16,
+    "impactMotorPauseSeconds": 0.12,
+    "stopVelocity": 0.75,
+    "maxCollisionIterations": 3
+  },
+  "start": {
+    "x": -200,
+    "z": 240,
+    "heading": 0
+  },
+  "goal": {
+    "x": 200,
+    "z": 200,
+    "radius": 38
+  },
+  "tray": {
+    "x": -380,
+    "z": 235
+  },
+  "assets": {
+    "straight": "./assets/stl/maze_piece_straight_v1.stl",
+    "corner": "./assets/stl/maze_piece_corner_v1.stl",
+    "end": "./assets/stl/maze_piece_end_v1.stl"
+  },
+  "collisionProfiles": {
+    "straight": {
+      "closedSides": [
+        "north",
+        "south"
+      ],
+      "wallInset": 19.2
+    },
+    "corner": {
+      "closedSides": [
+        "south",
+        "west"
+      ],
+      "wallInset": 19.2
+    },
+    "end": {
+      "closedSides": [
+        "east",
+        "south",
+        "west"
+      ],
+      "wallInset": 19.2
+    }
+  },
+  "tiles": [
+    {
+      "piece": "end",
+      "x": -200,
+      "z": 200,
+      "yawDegrees": 0
+    },
+    {
+      "piece": "straight",
+      "x": -200,
+      "z": 0,
+      "yawDegrees": 90
+    },
+    {
+      "piece": "corner",
+      "x": -200,
+      "z": -200,
+      "yawDegrees": -90
+    },
+    {
+      "piece": "straight",
+      "x": 0,
+      "z": -200,
+      "yawDegrees": 0
+    },
+    {
+      "piece": "corner",
+      "x": 200,
+      "z": -200,
+      "yawDegrees": 180
+    },
+    {
+      "piece": "straight",
+      "x": 200,
+      "z": 0,
+      "yawDegrees": 90
+    },
+    {
+      "piece": "end",
+      "x": 200,
+      "z": 200,
+      "yawDegrees": 0
+    }
+  ],
+  "navigationPolygon": [
+    {
+      "x": -280.8,
+      "z": -280.8
+    },
+    {
+      "x": 280.8,
+      "z": -280.8
+    },
+    {
+      "x": 280.8,
+      "z": 280.8
+    },
+    {
+      "x": 119.2,
+      "z": 280.8
+    },
+    {
+      "x": 119.2,
+      "z": -100
+    },
+    {
+      "x": 100,
+      "z": -100
+    },
+    {
+      "x": 100,
+      "z": -119.2
+    },
+    {
+      "x": -100,
+      "z": -119.2
+    },
+    {
+      "x": -100,
+      "z": -100
+    },
+    {
+      "x": -119.2,
+      "z": -100
+    },
+    {
+      "x": -119.2,
+      "z": 280.8
+    },
+    {
+      "x": -280.8,
+      "z": 280.8
+    }
+  ],
+  "referenceSolution": [
+    {
+      "command": "roll",
+      "heading": 0,
+      "speed": 160,
+      "seconds": 4.4
+    },
+    {
+      "command": "spin",
+      "degrees": 90,
+      "seconds": 0.5
+    },
+    {
+      "command": "roll",
+      "heading": 0,
+      "speed": 160,
+      "seconds": 4
+    },
+    {
+      "command": "spin",
+      "degrees": 90,
+      "seconds": 0.5
+    },
+    {
+      "command": "roll",
+      "heading": 0,
+      "speed": 160,
+      "seconds": 4
+    }
+  ]
+}

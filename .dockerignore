@@ -1,0 +1,7 @@
+*
+!deploy/
+!deploy/**
+!game/
+!game/**
+game/README.md
+game/tests/

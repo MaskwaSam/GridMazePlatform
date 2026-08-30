@@ -1,0 +1,17 @@
+{
+  "name": "Maskwa Maze Lab",
+  "short_name": "Maskwa Maze",
+  "description": "Program a sphere robot to solve 3D mazes.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#eef5f8",
+  "theme_color": "#102a43",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

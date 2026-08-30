@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#102a43">
+  <meta name="description" content="Program a virtual sphere robot to solve 3D printable mazes with blocks or Python.">
+  <title>Maskwa Maze Lab</title>
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./vendor/blockly/blockly.min.js"></script>
+  <script src="./vendor/blockly/python_compressed.js"></script>
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three/three.module.min.js" } }
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#code-studio">Skip to code editor</a>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow" id="level-number">Sphere robotics · maze 01 of 07</p>
+      <h1>Maskwa Maze Lab</h1>
+    </div>
+    <div class="level-navigation">
+      <label for="level-select">Choose maze</label>
+      <select id="level-select" aria-label="Choose maze level">
+        <option value="straight-start">1 · Straight Start — Beginning</option>
+      </select>
+      <div class="level-summary" aria-label="Current level" aria-live="polite">
+        <span class="level-dot" aria-hidden="true"></span>
+        <span>
+          <strong><span id="level-name">Straight Start</span><span class="difficulty-chip" id="level-difficulty">Beginning</span></strong>
+          <small id="level-description">Learn speed and timing by driving straight north to the goal.</small>
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <main class="game-layout">
+    <section class="scene-card" id="maze-panel" aria-labelledby="maze-heading">
+      <div class="panel-heading scene-heading">
+        <div>
+          <p class="step-label">1 · Place and test</p>
+          <h2 id="maze-heading">The maze</h2>
+        </div>
+        <div class="scene-actions">
+          <button class="button button-secondary" id="idle-tour-button" type="button" aria-pressed="true" title="Focus the maze and press Ctrl+R to start rotating.">Idle tour: on</button>
+          <button class="button button-secondary" id="place-button" type="button">Place at start center</button>
+          <button class="button button-secondary fullscreen-button" id="maze-fullscreen-button" type="button" aria-controls="maze-panel" aria-label="Open maze fullscreen" aria-pressed="false" title="Open maze fullscreen"><span aria-hidden="true">⛶</span></button>
+        </div>
+      </div>
+
+      <div class="scene-wrap" id="scene-wrap">
+            <canvas id="maze-canvas" tabindex="0" aria-keyshortcuts="Control+R" aria-label="Interactive 3D maze with a 70 mm sphere robot. Its white band and orange marker rotate to show rolling. Drag it anywhere onto the highlighted blue starting piece. The release point becomes its starting position. Press Control plus R while focused to start rotating."></canvas>
+        <div class="scene-help" id="scene-help">
+          <span aria-hidden="true">↔</span> Drop anywhere on the blue START piece. Your release point becomes the start.
+        </div>
+        <div class="heading-key" aria-label="Robot-relative direction key"><span>FORWARD · 0°</span><span>RIGHT · +90°</span></div>
+        <div class="loading-card" id="scene-loading" role="status">Loading maze pieces…</div>
+      </div>
+
+      <div class="run-bar" aria-label="Program controls">
+        <button class="button button-run" id="run-button" type="button" disabled>
+          <span aria-hidden="true">▶</span> Run
+        </button>
+        <button class="button button-stop" id="stop-button" type="button" disabled>
+          <span aria-hidden="true">■</span> Stop
+        </button>
+        <button class="button button-secondary" id="reset-button" type="button">
+          <span aria-hidden="true">↺</span> Reset
+        </button>
+        <div class="attempt-readout">
+          <span id="run-state" class="status-pill" data-state="waiting">Waiting for robot</span>
+          <span id="telemetry">Facing 0° · Drive 0 · Actual 0 · Impacts 0</span>
+        </div>
+      </div>
+
+      <div class="success-banner" id="success-banner" role="status" aria-live="assertive" hidden>
+        <span class="success-icon" aria-hidden="true">✓</span>
+        <div><strong>Maze solved!</strong><span id="success-level-name">This level is complete.</span></div>
+        <div class="success-actions">
+          <button class="button button-secondary" id="run-again-button" type="button">Run again</button>
+          <button class="button button-next" id="next-level-button" type="button">Next maze</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="studio-card" id="code-studio" aria-labelledby="studio-heading">
+      <div class="panel-heading studio-heading">
+        <div>
+          <p class="step-label">2 · Build your solution</p>
+          <h2 id="studio-heading">Coding Workspace</h2>
+        </div>
+        <div class="studio-controls">
+          <div class="studio-top-row">
+            <div class="editor-tabs" role="tablist" aria-label="Coding language">
+              <button id="blocks-tab" class="editor-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="blocks-panel">Blocks</button>
+              <button id="python-tab" class="editor-tab" type="button" role="tab" aria-selected="false" aria-controls="python-panel">Python</button>
+            </div>
+            <button class="button button-secondary fullscreen-button" id="studio-fullscreen-button" type="button" aria-controls="code-studio" aria-label="Open Coding Workspace fullscreen" aria-pressed="false" title="Open Coding Workspace fullscreen"><span aria-hidden="true">⛶</span></button>
+          </div>
+          <div class="work-actions" aria-label="Student work controls">
+            <button class="work-button" id="save-work-button" type="button">Save</button>
+            <button class="work-button" id="attempt-history-button" type="button">Attempts <span id="attempt-count">0</span></button>
+            <button class="work-button" id="export-work-button" type="button">Export</button>
+            <button class="work-button" id="import-work-button" type="button">Import</button>
+            <input id="import-work-file" type="file" accept=".json,.maskwamaze,.mazebot,application/json" hidden>
+          </div>
+          <span class="save-status" id="save-status" role="status" aria-live="polite">Autosaves locally</span>
+        </div>
+      </div>
+
+      <div id="blocks-panel" class="editor-panel" role="tabpanel" aria-labelledby="blocks-tab">
+        <div id="blockly-editor" aria-label="Block programming workspace"></div>
+      </div>
+
+      <div id="python-panel" class="editor-panel python-panel" role="tabpanel" aria-labelledby="python-tab" hidden>
+        <div class="python-notice">
+          <div>
+            <strong id="python-mode-label">Generated from blocks</strong>
+            <span id="python-mode-help">Blocks generate Python one way. Editing Python makes an independent copy and never changes your blocks. Maximum 20,000 characters.</span>
+          </div>
+          <button class="text-button" id="regenerate-python" type="button" hidden>Replace with block code</button>
+        </div>
+        <label class="sr-only" for="python-editor">Python program</label>
+        <textarea id="python-editor" maxlength="20000" spellcheck="false" autocomplete="off" autocapitalize="off" aria-describedby="python-mode-help"></textarea>
+      </div>
+
+      <details class="quick-guide">
+        <summary>Robot commands and tips</summary>
+        <div class="guide-grid">
+          <div><code>await roll(0, 160, 4.5)</code><span>Roll forward from the sphere's current direction, then brake. A wall contact rebounds.</span></div>
+          <div><code>await spin(90, 0.5)</code><span>Brake and turn right. That direction becomes forward for the next <code>roll(0, …)</code>.</span></div>
+          <div><code>await wait(1)</code><span>Keep the current drive speed and facing for one simulation second.</span></div>
+        </div>
+      </details>
+
+      <div class="console" aria-label="Program output">
+        <div class="console-title"><span>Program log</span><button class="text-button" id="clear-log" type="button">Clear</button></div>
+        <pre id="program-log" aria-live="polite">Ready. Place the robot anywhere on the START piece.</pre>
+      </div>
+    </section>
+  </main>
+
+  <dialog class="attempt-dialog" id="attempt-history-dialog" aria-labelledby="attempt-history-title">
+    <div class="attempt-dialog-heading">
+      <div>
+        <p class="step-label">Code progress · oldest to newest</p>
+        <h2 id="attempt-history-title">Attempt history</h2>
+      </div>
+      <form method="dialog"><button class="dialog-close" type="submit" aria-label="Close attempt history">×</button></form>
+    </div>
+    <p class="attempt-dialog-help" id="attempt-history-summary">Every Run and manual Save records the exact code. The latest 20 entries are kept for each maze.</p>
+    <div class="attempt-history-list" id="attempt-history-list"></div>
+  </dialog>
+
+  <noscript>This game requires JavaScript. Ask your teacher to enable JavaScript in Chrome.</noscript>
+  <script>
+    if ("serviceWorker" in navigator && location.protocol !== "file:") {
+      navigator.serviceWorker.register("./service-worker.js?v=32", { updateViaCache: "none" }).catch(() => {});
+    }
+  </script>
+  <script type="module" src="./js/main.js?v=32"></script>
+</body>
+</html>

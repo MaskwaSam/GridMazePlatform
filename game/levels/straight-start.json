@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 2,
+  "id": "straight-start",
+  "sequence": 1,
+  "name": "Straight Start",
+  "description": "Learn speed and timing by stopping on the goal.",
+  "difficulty": "Beginning",
+  "concepts": [
+    "forward",
+    "speed",
+    "time"
+  ],
+  "units": "millimetres",
+  "tileSize": 200,
+  "baseTop": 10,
+  "robotDiameter": 70,
+  "robotRadius": 35,
+  "physics": {
+    "driveAcceleration": 900,
+    "brakeAcceleration": 900,
+    "coastDeceleration": 55,
+    "wallRestitution": 0.58,
+    "wallFriction": 0.16,
+    "impactMotorPauseSeconds": 0.12,
+    "stopVelocity": 0.75,
+    "maxCollisionIterations": 3
+  },
+  "start": {
+    "x": 0,
+    "z": 240,
+    "heading": 0
+  },
+  "goal": {
+    "x": 0,
+    "z": -200,
+    "radius": 38
+  },
+  "tray": {
+    "x": -180,
+    "z": 235
+  },
+  "assets": {
+    "straight": "./assets/stl/maze_piece_straight_v1.stl",
+    "corner": "./assets/stl/maze_piece_corner_v1.stl",
+    "end": "./assets/stl/maze_piece_end_v1.stl"
+  },
+  "collisionProfiles": {
+    "straight": {
+      "closedSides": [
+        "north",
+        "south"
+      ],
+      "wallInset": 19.2
+    },
+    "corner": {
+      "closedSides": [
+        "south",
+        "west"
+      ],
+      "wallInset": 19.2
+    },
+    "end": {
+      "closedSides": [
+        "east",
+        "south",
+        "west"
+      ],
+      "wallInset": 19.2
+    }
+  },
+  "tiles": [
+    {
+      "piece": "end",
+      "x": 0,
+      "z": 200,
+      "yawDegrees": 0
+    },
+    {
+      "piece": "straight",
+      "x": 0,
+      "z": 0,
+      "yawDegrees": 90
+    },
+    {
+      "piece": "end",
+      "x": 0,
+      "z": -200,
+      "yawDegrees": 180
+    }
+  ],
+  "navigationPolygon": [
+    {
+      "x": -80.8,
+      "z": -280.8
+    },
+    {
+      "x": 80.8,
+      "z": -280.8
+    },
+    {
+      "x": 80.8,
+      "z": 280.8
+    },
+    {
+      "x": -80.8,
+      "z": 280.8
+    }
+  ],
+  "referenceSolution": [
+    {
+      "command": "roll",
+      "heading": 0,
+      "speed": 160,
+      "seconds": 4.4
+    }
+  ]
+}

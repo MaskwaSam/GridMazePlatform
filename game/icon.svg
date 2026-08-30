@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Maskwa Maze Lab icon">
+  <rect width="512" height="512" rx="108" fill="#102a43"/>
+  <path d="M83 105h346v302H83z" fill="#dff4f7"/>
+  <path d="M83 105h110v78H83m236-78h110v188H319m-126 32H83v82h236V293H193z" fill="#3a8392"/>
+  <path d="M193 105v142h126v160" fill="none" stroke="#1479cc" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="193" cy="145" r="51" fill="#59bfff" stroke="#fff" stroke-width="13"/>
+  <path d="m193 105-17 30h34z" fill="#fff"/>
+  <circle cx="319" cy="374" r="35" fill="#39bd7d" stroke="#fff" stroke-width="10"/>
+</svg>
