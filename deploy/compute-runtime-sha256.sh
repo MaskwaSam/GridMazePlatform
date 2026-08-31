@@ -46,6 +46,7 @@ trap 'rm -f "$inventory_file" "$hashes_file" "$payload_file"' EXIT HUP INT TERM
   cd "$runtime_root"
   find . -type f \
     ! -path './README.md' \
+    ! -path './MULTIPLAYER.md' \
     ! -path './tests/*' \
     -print | sed 's#^\./##' | LC_ALL=C sort
 ) > "$payload_file"

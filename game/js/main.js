@@ -7,16 +7,33 @@ import {
   loadBlocks,
   saveBlocks,
   validateBlocksState,
-} from "./blocks.js?v=32";
-import { isMazeRotationShortcut } from "./level-logic.js?v=32";
-import { MazeSimulation } from "./simulation.js?v=32";
-import { PythonRuntime } from "./python-runtime.js?v=32";
+} from "./blocks.js?v=36";
+import { isMazeRotationShortcut } from "./level-logic.js?v=36";
+import { MazeSimulation } from "./simulation.js?v=36";
+import { PythonRuntime } from "./python-runtime.js?v=36";
+import {
+  GAME_ACTION_KINDS,
+  GameActionRouter,
+  isShareableGameAction,
+} from "./game-actions.js?v=36";
+import {
+  GAMEPAD_ACTIONS,
+  GAMEPAD_STATUS,
+  createGamepadController,
+} from "./gamepad.js?v=36";
+import { createMultiplayerClient } from "./multiplayer-client.js?v=37";
+import {
+  DEFAULT_SETTINGS,
+  loadSettings,
+  normalizeSettings,
+  saveSettings,
+} from "./settings.js?v=36";
 import {
   LEVEL_CATALOG,
   chooseInitialLevelId,
   levelEntry,
   nextLevelId,
-} from "./levels.js?v=32";
+} from "./levels.js?v=36";
 import {
   commitProjectImport,
   exportProject,
@@ -30,7 +47,7 @@ import {
   normalizeAttemptHistory,
   prepareProjectImport,
   saveState,
-} from "./storage.js?v=32";
+} from "./storage.js?v=36";
 
 const elements = Object.fromEntries([
   "level-name", "level-description", "maze-panel", "maze-canvas", "code-studio", "place-button", "idle-tour-button", "maze-fullscreen-button",
@@ -42,14 +59,31 @@ const elements = Object.fromEntries([
   "save-work-button", "attempt-history-button", "attempt-count", "export-work-button",
   "import-work-button", "import-work-file", "save-status", "attempt-history-dialog",
   "attempt-history-title", "attempt-history-summary", "attempt-history-list",
+  "settings-button", "settings-dialog", "settings-status", "settings-defaults-button",
+  "setting-idle-tour", "setting-reduce-motion", "setting-clear-view", "setting-show-trail",
+  "setting-show-impact-markers", "setting-show-grid", "setting-confirm-reset", "setting-controller-enabled",
+  "controller-panel", "controller-status", "heading-key",
 ].map((id) => [id, document.getElementById(id)]));
 
 const KNOWN_LEVEL_IDS = LEVEL_CATALOG.map((entry) => entry.id);
+const SETTINGS_CONTROL_IDS = Object.freeze({
+  idleTour: "setting-idle-tour",
+  reduceMotion: "setting-reduce-motion",
+  clearView: "setting-clear-view",
+  showTrail: "setting-show-trail",
+  showImpactMarkers: "setting-show-impact-markers",
+  showGrid: "setting-show-grid",
+  confirmReset: "setting-confirm-reset",
+  controllerEnabled: "setting-controller-enabled",
+});
 
 let level;
 let workspace;
 let simulation;
 let runtime;
+let actionRouter;
+let gamepadController;
+let multiplayerClient;
 let editorMode = "blocks";
 let pythonDetached = false;
 let robotPlaced = false;
@@ -64,6 +98,10 @@ let programSucceeded = false;
 let saveTimer = 0;
 let saveStatusTimer = 0;
 let levelLoading = true;
+let layoutResizeFrame = 0;
+let statePersistenceSuspended = false;
+let userSettings = loadSettings();
+document.documentElement.dataset.reduceMotion = String(userSettings.reduceMotion);
 
 async function start() {
   try {
@@ -89,14 +127,34 @@ async function start() {
     });
     await simulation.loadLevel(level);
     if (restorePlacement) simulation.placeOnStart(restorePose);
-    updateIdleTourButton();
+    configureGameActions();
+    multiplayerClient = createMultiplayerClient({
+      levelId: level.id,
+      participantId: createLocalParticipantId(),
+      executeLocalCommand: (method, args) => simulation.executeRpc(method, args),
+      onRemoteAction: (action) => dispatchGameAction(action, { source: "remote" }),
+      onError: (error, context) => {
+        appendLog(`MULTIPLAYER ${String(context || "ERROR").toUpperCase()}: ${String(error?.message || error)}`);
+      },
+      clientVersion: "static-client-v1",
+    });
+    actionRouter.subscribe((action) => {
+      if (!["ui", "gamepad"].includes(action.source) || !isShareableGameAction(action)) return;
+      multiplayerClient.shareAction(action);
+    });
 
     runtime = new PythonRuntime({
-      onRpc: (method, args) => simulation.executeRpc(method, args),
+      onRpc: (method, args) => multiplayerClient.executeRobotCommand({ method, args }),
       onLog: appendLog,
       onState: handleRuntimeState,
     });
+    gamepadController = createGamepadController({
+      onAction: handleGamepadAction,
+      onStatus: updateControllerStatus,
+      shouldHandleInput: shouldHandleGamepadInput,
+    });
     bindInterface();
+    applyUserSettings({ persist: false, announce: false });
     if (hasLegacySavedState()) {
       appendLog("LEGACY BACKUP: An older absolute-heading program remains stored, but was not loaded under the new robot-relative controls.");
     }
@@ -126,6 +184,10 @@ async function loadLevel(levelId) {
 }
 
 function restorePrograms() {
+  restoreProgramsFromState(loadSavedState(level.id));
+}
+
+function restoreProgramsFromState(saved) {
   editorMode = "blocks";
   pythonDetached = false;
   robotPlaced = false;
@@ -134,7 +196,6 @@ function restorePrograms() {
   attemptCounter = 0;
   activeAttemptId = null;
   elements["python-editor"].value = "";
-  const saved = loadSavedState(level.id);
   if (saved?.blocks) {
     try { loadBlocks(workspace, saved.blocks); }
     catch { createStarterProgram(workspace); }
@@ -157,32 +218,39 @@ function restorePrograms() {
 }
 
 function bindInterface() {
-  elements["level-select"].addEventListener("change", (event) => void switchLevel(event.currentTarget.value));
-  elements["place-button"].addEventListener("click", () => simulation.placeOnStart());
+  elements["level-select"].addEventListener("change", (event) => dispatchGameAction({
+    kind: GAME_ACTION_KINDS.SELECT_LEVEL,
+    payload: { levelId: event.currentTarget.value },
+  }));
+  elements["place-button"].addEventListener("click", () => dispatchGameAction(GAME_ACTION_KINDS.PLACE_CENTER));
   elements["idle-tour-button"].addEventListener("click", () => {
-    simulation.setIdleTourEnabled(!simulation.idleTourEnabled);
-    updateIdleTourButton();
+    userSettings = { ...userSettings, idleTour: !userSettings.idleTour };
+    applyUserSettings({ persist: true });
   });
   elements["maze-canvas"].addEventListener("keydown", handleMazeRotationShortcut);
   elements["maze-fullscreen-button"].addEventListener("click", () => void togglePanelFullscreen(elements["maze-panel"]));
   elements["studio-fullscreen-button"].addEventListener("click", () => void togglePanelFullscreen(elements["code-studio"]));
-  elements["run-button"].addEventListener("click", () => void runProgram());
-  elements["stop-button"].addEventListener("click", stopProgram);
-  elements["reset-button"].addEventListener("click", resetAttempt);
-  elements["run-again-button"].addEventListener("click", () => {
-    elements["success-banner"].hidden = true;
-    resetAttempt();
-    void runProgram();
-  });
-  elements["next-level-button"].addEventListener("click", () => {
-    const next = nextLevelId(level.id);
-    if (next) void switchLevel(next);
-  });
+  elements["run-button"].addEventListener("click", () => dispatchGameAction(GAME_ACTION_KINDS.RUN));
+  elements["stop-button"].addEventListener("click", () => dispatchGameAction(GAME_ACTION_KINDS.STOP));
+  elements["reset-button"].addEventListener("click", () => dispatchGameAction(GAME_ACTION_KINDS.RESET));
+  elements["run-again-button"].addEventListener("click", () => dispatchGameAction(GAME_ACTION_KINDS.RUN_AGAIN));
+  elements["next-level-button"].addEventListener("click", () => dispatchGameAction(GAME_ACTION_KINDS.NEXT_LEVEL));
   elements["save-work-button"].addEventListener("click", saveCurrentVersion);
-  elements["attempt-history-button"].addEventListener("click", openAttemptHistory);
+  elements["attempt-history-button"].addEventListener("click", () => dispatchGameAction(GAME_ACTION_KINDS.OPEN_ATTEMPTS));
   elements["export-work-button"].addEventListener("click", exportStudentWork);
   elements["import-work-button"].addEventListener("click", () => elements["import-work-file"].click());
   elements["import-work-file"].addEventListener("change", (event) => void importStudentWork(event));
+  elements["settings-button"].addEventListener("click", () => dispatchGameAction(GAME_ACTION_KINDS.OPEN_SETTINGS));
+  elements["settings-dialog"].addEventListener("close", () => {
+    if (!elements["attempt-history-dialog"].open) elements["settings-button"].focus();
+  });
+  elements["settings-defaults-button"].addEventListener("click", restoreDefaultSettings);
+  for (const [key, id] of Object.entries(SETTINGS_CONTROL_IDS)) {
+    elements[id].addEventListener("change", (event) => {
+      userSettings = { ...userSettings, [key]: event.currentTarget.checked };
+      applyUserSettings({ persist: true });
+    });
+  }
   elements["clear-log"].addEventListener("click", () => { elements["program-log"].textContent = ""; });
   elements["blocks-tab"].addEventListener("click", () => setEditorMode("blocks"));
   elements["python-tab"].addEventListener("click", () => setEditorMode("python"));
@@ -213,23 +281,194 @@ function bindInterface() {
     event.preventDefault();
     event.returnValue = "";
   });
+  window.addEventListener("pagehide", () => {
+    gamepadController?.destroy();
+    multiplayerClient?.destroy();
+  }, { once: true });
   document.addEventListener("fullscreenchange", updateFullscreenControls);
   document.addEventListener("fullscreenerror", () => appendLog("Fullscreen is unavailable in this browser window."));
+  window.addEventListener("resize", scheduleInteractiveResize, { passive: true });
+  window.addEventListener("orientationchange", scheduleInteractiveResize, { passive: true });
+  window.visualViewport?.addEventListener("resize", scheduleInteractiveResize, { passive: true });
   updateFullscreenControls();
 }
 
+function configureGameActions() {
+  actionRouter = new GameActionRouter({
+    onError: (error, action) => {
+      appendLog(`CONTROL ERROR (${action.kind}): ${String(error?.message || error)}`);
+      console.error(error);
+    },
+  });
+  actionRouter.register(GAME_ACTION_KINDS.PLACE_CENTER, () => simulation.placeOnStart());
+  actionRouter.register(GAME_ACTION_KINDS.RUN, () => runProgram());
+  actionRouter.register(GAME_ACTION_KINDS.STOP, () => stopProgram());
+  actionRouter.register(GAME_ACTION_KINDS.RESET, () => requestReset());
+  actionRouter.register(GAME_ACTION_KINDS.RUN_AGAIN, () => {
+    const source = prepareProgramSource();
+    if (source === null) return false;
+    elements["success-banner"].hidden = true;
+    resetAttempt();
+    return startProgram(source);
+  });
+  actionRouter.register(GAME_ACTION_KINDS.TOGGLE_EDITOR, () => {
+    if (running || levelLoading) return false;
+    setEditorMode(editorMode === "blocks" ? "python" : "blocks");
+    elements[`${editorMode}-tab`].focus({ preventScroll: true });
+    return true;
+  });
+  actionRouter.register(GAME_ACTION_KINDS.OPEN_SETTINGS, () => toggleSettings());
+  actionRouter.register(GAME_ACTION_KINDS.OPEN_ATTEMPTS, () => toggleAttemptHistory());
+  actionRouter.register(GAME_ACTION_KINDS.PREVIOUS_LEVEL, () => switchRelativeLevel(-1));
+  actionRouter.register(GAME_ACTION_KINDS.NEXT_LEVEL, () => switchRelativeLevel(1));
+  actionRouter.register(GAME_ACTION_KINDS.SELECT_LEVEL, (action) => switchLevel(action.payload.levelId));
+}
+
+function dispatchGameAction(value, { source = "ui" } = {}) {
+  const pending = actionRouter?.dispatch(value, { source });
+  if (!pending) return Promise.resolve(false);
+  return pending.catch(() => false);
+}
+
+function switchRelativeLevel(offset) {
+  if (running || levelLoading) return false;
+  const index = LEVEL_CATALOG.findIndex((entry) => entry.id === level.id);
+  const target = LEVEL_CATALOG[index + offset];
+  if (!target) return false;
+  return switchLevel(target.id);
+}
+
+function toggleSettings() {
+  if (elements["settings-dialog"].open) {
+    elements["settings-dialog"].close();
+    return false;
+  }
+  openSettings();
+  return true;
+}
+
+function toggleAttemptHistory() {
+  if (elements["attempt-history-dialog"].open) {
+    elements["attempt-history-dialog"].close();
+    elements["attempt-history-button"].focus({ preventScroll: true });
+    return false;
+  }
+  if (running || levelLoading) return false;
+  openAttemptHistory();
+  return true;
+}
+
+function handleGamepadAction(action) {
+  const options = { source: "gamepad" };
+  switch (action) {
+    case GAMEPAD_ACTIONS.PRIMARY:
+      if (!robotPlaced) return dispatchGameAction(GAME_ACTION_KINDS.PLACE_CENTER, options);
+      return dispatchGameAction(programSucceeded ? GAME_ACTION_KINDS.RUN_AGAIN : GAME_ACTION_KINDS.RUN, options);
+    case GAMEPAD_ACTIONS.STOP: return dispatchGameAction(GAME_ACTION_KINDS.STOP, options);
+    case GAMEPAD_ACTIONS.RESET: return dispatchGameAction(GAME_ACTION_KINDS.RESET, options);
+    case GAMEPAD_ACTIONS.TOGGLE_EDITOR: return dispatchGameAction(GAME_ACTION_KINDS.TOGGLE_EDITOR, options);
+    case GAMEPAD_ACTIONS.ATTEMPTS: return dispatchGameAction(GAME_ACTION_KINDS.OPEN_ATTEMPTS, options);
+    case GAMEPAD_ACTIONS.SETTINGS: return dispatchGameAction(GAME_ACTION_KINDS.OPEN_SETTINGS, options);
+    case GAMEPAD_ACTIONS.PREVIOUS_LEVEL: return dispatchGameAction(GAME_ACTION_KINDS.PREVIOUS_LEVEL, options);
+    case GAMEPAD_ACTIONS.NEXT_LEVEL: return dispatchGameAction(GAME_ACTION_KINDS.NEXT_LEVEL, options);
+    default: return false;
+  }
+}
+
+function shouldHandleGamepadInput(action) {
+  if (action === GAMEPAD_ACTIONS.STOP) return running;
+  if (action === GAMEPAD_ACTIONS.SETTINGS) return true;
+  if (elements["settings-dialog"].open) return false;
+  if (elements["attempt-history-dialog"].open) return action === GAMEPAD_ACTIONS.ATTEMPTS;
+  if (isTextEntryActive()) return false;
+  if (levelLoading) return false;
+  if (running) return action === GAMEPAD_ACTIONS.RESET;
+  return true;
+}
+
+function isTextEntryActive() {
+  const active = document.activeElement;
+  return active instanceof HTMLInputElement
+    || active instanceof HTMLTextAreaElement
+    || active instanceof HTMLSelectElement
+    || Boolean(active?.isContentEditable)
+    || Boolean(active?.closest?.(".blocklyWidgetDiv, .blocklyDropDownDiv"));
+}
+
+function updateControllerStatus(status = { state: GAMEPAD_STATUS.DISABLED }) {
+  const messages = {
+    [GAMEPAD_STATUS.DISABLED]: "Controller support is off.",
+    [GAMEPAD_STATUS.UNSUPPORTED]: "This browser does not provide controller support.",
+    [GAMEPAD_STATUS.SEARCHING]: "Waiting for a controller. Pair it in Bluetooth, then press any controller button.",
+    [GAMEPAD_STATUS.DISCONNECTED]: "Controller disconnected. Reconnect it, then press any controller button.",
+  };
+  const connected = status.state === GAMEPAD_STATUS.CONNECTED;
+  elements["controller-status"].textContent = connected
+    ? `Connected: ${status.label || "controller"}.`
+    : messages[status.state] || "Controller status unavailable.";
+  elements["controller-status"].dataset.state = status.state;
+}
+
 function updateIdleTourButton() {
-  const enabled = simulation?.idleTourEnabled !== false;
+  const enabled = userSettings.idleTour;
+  const paused = enabled && simulation?.isReducedMotionActive();
+  const stateLabel = paused ? "paused" : enabled ? "on" : "off";
   elements["idle-tour-button"].setAttribute("aria-pressed", String(enabled));
-  elements["idle-tour-button"].textContent = `Idle tour: ${enabled ? "on" : "off"}`;
+  elements["idle-tour-button"].setAttribute(
+    "aria-label",
+    `Turn idle tour ${enabled ? "off" : "on"}${paused ? "; currently paused by reduced motion" : ""}`,
+  );
+  elements["idle-tour-button"].textContent = `Idle tour: ${stateLabel}`;
+  elements["idle-tour-button"].dataset.mobileLabel = `Tour ${stateLabel}`;
 }
 
 function handleMazeRotationShortcut(event) {
   if (!isMazeRotationShortcut(event)) return;
   event.preventDefault();
   event.stopPropagation();
+  userSettings = { ...userSettings, idleTour: true };
+  applyUserSettings({ persist: true, announce: false });
   simulation.startIdleTour();
   updateIdleTourButton();
+}
+
+function openSettings() {
+  if (elements["attempt-history-dialog"].open) elements["attempt-history-dialog"].close();
+  applyUserSettings({ persist: false, announce: false });
+  if (!elements["settings-dialog"].open) elements["settings-dialog"].showModal();
+  requestAnimationFrame(() => elements["setting-idle-tour"].focus());
+}
+
+function applyUserSettings({ persist = false, announce = true } = {}) {
+  userSettings = normalizeSettings(userSettings);
+  for (const [key, id] of Object.entries(SETTINGS_CONTROL_IDS)) {
+    elements[id].checked = userSettings[key];
+  }
+  document.documentElement.dataset.reduceMotion = String(userSettings.reduceMotion);
+  simulation?.applyVisualSettings(userSettings);
+  elements["controller-panel"].hidden = !userSettings.controllerEnabled;
+  gamepadController?.setEnabled(userSettings.controllerEnabled);
+  updateIdleTourButton();
+  if (persist) {
+    const saved = saveSettings(userSettings);
+    elements["settings-status"].textContent = saved
+      ? "Saved on this device."
+      : "Active for now, but this browser could not save the choice.";
+    elements["settings-status"].dataset.state = saved ? "" : "error";
+  } else if (announce) {
+    elements["settings-status"].textContent = "";
+    elements["settings-status"].dataset.state = "";
+  }
+  scheduleInteractiveResize();
+  return { ...userSettings };
+}
+
+function restoreDefaultSettings() {
+  userSettings = { ...DEFAULT_SETTINGS };
+  applyUserSettings({ persist: true });
+  if (elements["settings-status"].dataset.state !== "error") {
+    elements["settings-status"].textContent = "Defaults restored and saved.";
+  }
 }
 
 async function togglePanelFullscreen(panel) {
@@ -255,7 +494,12 @@ function updateFullscreenControls() {
     button.setAttribute("aria-label", `${active ? "Exit" : "Open"} ${label} fullscreen`);
     button.title = `${active ? "Exit" : "Open"} ${label} fullscreen`;
   }
-  requestAnimationFrame(() => {
+  scheduleInteractiveResize();
+}
+
+function scheduleInteractiveResize() {
+  cancelAnimationFrame(layoutResizeFrame);
+  layoutResizeFrame = requestAnimationFrame(() => {
     simulation?.resize();
     if (workspace) Blockly.svgResize(workspace);
   });
@@ -270,7 +514,7 @@ function populateLevelSelector() {
   }));
 }
 
-function renderLevelDetails() {
+function renderLevelDetails({ updateUrl = true } = {}) {
   const entry = levelEntry(level.id);
   elements["level-select"].value = level.id;
   elements["level-name"].textContent = level.name;
@@ -279,21 +523,34 @@ function renderLevelDetails() {
   elements["level-difficulty"].textContent = level.difficulty;
   elements["success-level-name"].textContent = `${level.name} solved.`;
   elements["next-level-button"].hidden = !nextLevelId(level.id);
-  updateLevelUrl(level.id);
+  if (updateUrl) updateLevelUrl(level.id);
 }
 
 async function switchLevel(levelId, { persistCurrent = true } = {}) {
   if (levelLoading || running || levelId === level.id || !levelEntry(levelId)) {
     elements["level-select"].value = level.id;
-    return;
+    return false;
   }
 
   if (persistCurrent && !persistState()) {
     elements["level-select"].value = level.id;
     setSaveStatus("Maze not changed · current work is not saved", "error");
     appendLog("SAVE FAILED: Fix the current program or export a recovery copy before changing mazes.");
-    return;
+    return false;
   }
+  const previousLevel = level;
+  const savedPreviousState = persistCurrent ? currentStateRecord() : loadSavedState(level.id);
+  const previousState = cloneLevelStateRecord(savedPreviousState || currentStateRecord());
+  const previousSimulationSession = simulation.captureSession();
+  const previousUi = {
+    programSucceeded,
+    runState: elements["run-state"].textContent,
+    runStateKind: elements["run-state"].dataset.state,
+    successHidden: elements["success-banner"].hidden,
+  };
+  clearTimeout(saveTimer);
+  saveTimer = 0;
+  statePersistenceSuspended = true;
   if (elements["attempt-history-dialog"].open) elements["attempt-history-dialog"].close();
   activeRunId += 1;
   runtime?.terminate("Level changed.");
@@ -308,12 +565,11 @@ async function switchLevel(levelId, { persistCurrent = true } = {}) {
   setStatus("Loading level…", "running");
   updateControls();
 
-  const previousLevel = level;
+  let recoveryFailed = false;
   try {
     const nextLevel = await loadLevel(levelId);
     level = nextLevel;
     await simulation.loadLevel(level);
-    renderLevelDetails();
     restorePrograms();
     updateGeneratedPython();
     setEditorMode(editorMode, false);
@@ -321,19 +577,54 @@ async function switchLevel(levelId, { persistCurrent = true } = {}) {
     const restorePlacement = robotPlaced;
     const restorePose = robotStartPose;
     if (restorePlacement) simulation.placeOnStart(restorePose);
+    renderLevelDetails();
     setStatus(restorePlacement ? "Ready to run" : "Waiting for robot", restorePlacement ? "ready" : "waiting");
     appendLog(`LEVEL ${level.sequence} OF ${LEVEL_CATALOG.length}: ${level.name}`);
+    statePersistenceSuspended = false;
+    if (!persistState()) setSaveStatus("Maze loaded · current work could not be saved", "warning");
+    return true;
   } catch (error) {
     level = previousLevel;
-    renderLevelDetails();
+    if (simulation.level?.id !== previousLevel.id) {
+      try {
+        await simulation.loadLevel(previousLevel);
+      } catch (recoveryError) {
+        recoveryFailed = true;
+        elements["scene-loading"].textContent = "Reload the page to recover the maze.";
+        elements["scene-loading"].hidden = false;
+        setStatus("Maze recovery required", "error");
+        appendLog(`LEVEL RECOVERY FAILED: ${recoveryError.message || recoveryError}`);
+        console.error(recoveryError);
+      }
+    }
+    if (recoveryFailed) return false;
+    restoreProgramsFromState(previousState);
+    updateGeneratedPython();
+    setEditorMode(editorMode, false);
+    updatePythonNotice();
+    simulation.restoreSession(previousSimulationSession);
+    programSucceeded = previousUi.programSucceeded;
+    elements["success-banner"].hidden = previousUi.successHidden;
+    renderLevelDetails({ updateUrl: false });
+    try { updateLevelUrl(previousLevel.id); }
+    catch (urlError) {
+      appendLog(`LEVEL URL RECOVERY FAILED: ${urlError.message || urlError}`);
+      console.error(urlError);
+    }
     elements["scene-loading"].hidden = true;
-    setStatus(robotPlaced ? "Ready to run" : "Waiting for robot", robotPlaced ? "ready" : "waiting");
+    setStatus(previousUi.runState, previousUi.runStateKind);
     appendLog(`LEVEL LOAD FAILED: ${error.message || error} Staying on ${level.name}.`);
     console.error(error);
+    return false;
   } finally {
-    levelLoading = false;
+    statePersistenceSuspended = recoveryFailed;
+    levelLoading = recoveryFailed;
     updateControls();
   }
+}
+
+function cloneLevelStateRecord(record) {
+  return JSON.parse(JSON.stringify(record));
 }
 
 function updateLevelUrl(levelId) {
@@ -404,21 +695,30 @@ function handlePlacement(placed, pose = null) {
   scheduleSave();
 }
 
-async function runProgram() {
-  if (running || !robotPlaced) return;
-  const runId = ++activeRunId;
+function runProgram() {
+  const source = prepareProgramSource();
+  if (source === null) return false;
+  return startProgram(source);
+}
+
+function prepareProgramSource() {
+  if (running || !robotPlaced) return null;
   const source = editorMode === "blocks" ? generatePython(workspace) : elements["python-editor"].value;
   if (!source.trim() || source.trimStart().startsWith("# Add blocks")) {
     setStatus("Add some code first", "error");
-    return;
+    return null;
   }
   if (source.length > MAX_CODE_CHARACTERS) {
     setStatus("Program is too long", "error");
     setSaveStatus("Not saved · 20,000-character maximum", "error");
     appendLog("PROGRAM TOO LONG: shorten the generated or Python code to 20,000 characters.");
-    return;
+    return null;
   }
+  return source;
+}
 
+function startProgram(source) {
+  const runId = ++activeRunId;
   running = true;
   programSucceeded = false;
   elements["success-banner"].hidden = true;
@@ -428,6 +728,14 @@ async function runProgram() {
   setStatus("Loading Python…", "running");
   appendLog(`RUN · ${editorMode === "blocks" ? "Blocks → Python" : "Python"}`);
   updateControls();
+  void executeProgram(source, runId, attemptId).catch((error) => {
+    appendLog(`CONTROL ERROR (run): ${String(error?.message || error)}`);
+    console.error(error);
+  });
+  return true;
+}
+
+async function executeProgram(source, runId, attemptId) {
   try {
     await runtime.run(source);
     if (!programSucceeded) {
@@ -454,7 +762,7 @@ async function runProgram() {
 }
 
 function stopProgram() {
-  if (!running) return;
+  if (!running) return false;
   activeRunId += 1;
   runtime.terminate("Stopped by student.");
   simulation.cancelMotion("Stopped by student.");
@@ -464,6 +772,7 @@ function stopProgram() {
   setStatus("Stopped", "ready");
   appendLog("Program stopped by student.");
   updateControls();
+  return true;
 }
 
 function resetAttempt() {
@@ -477,6 +786,16 @@ function resetAttempt() {
   setStatus(robotPlaced ? "Ready to run" : "Waiting for robot", robotPlaced ? "ready" : "waiting");
   appendLog("Robot reset to your chosen starting position.");
   updateControls();
+}
+
+function requestReset() {
+  if (userSettings.confirmReset && !window.confirm(
+    running
+      ? "Stop this run and reset the robot to your chosen starting position?"
+      : "Reset the robot to your chosen starting position?",
+  )) return false;
+  resetAttempt();
+  return true;
 }
 
 function handleGoal() {
@@ -505,6 +824,12 @@ function handleRuntimeState(state, detail) {
 
 function updateTelemetry(data) {
   latestTelemetry = { ...data };
+  if (multiplayerClient?.session.mode === "room") {
+    multiplayerClient.projectLocalRobot(data, {
+      levelId: level.id,
+      status: programSucceeded ? "solved" : running ? "running" : null,
+    });
+  }
   elements.telemetry.textContent = `Facing ${data.heading}° · Drive ${data.commandedSpeed} · Actual ${data.speed} · Impacts ${data.collisions} · x ${data.x}, z ${data.z}`;
 }
 
@@ -543,6 +868,7 @@ function cleanError(message) {
 }
 
 function scheduleSave() {
+  if (statePersistenceSuspended) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     const saved = persistState();
@@ -555,6 +881,7 @@ function scheduleSave() {
 }
 
 function persistState() {
+  if (statePersistenceSuspended) return false;
   clearTimeout(saveTimer);
   saveTimer = 0;
   if (!workspace || !level) return false;
@@ -652,6 +979,7 @@ function saveCurrentVersion() {
 }
 
 function openAttemptHistory() {
+  if (elements["settings-dialog"].open) elements["settings-dialog"].close();
   renderAttemptHistory();
   const dialog = elements["attempt-history-dialog"];
   if (!dialog.open) dialog.showModal();
@@ -882,9 +1210,18 @@ function formatCoordinate(value) {
   return Number.isFinite(number) ? Math.round(number * 10) / 10 : "?";
 }
 
+function createLocalParticipantId() {
+  try {
+    const values = crypto.getRandomValues(new Uint32Array(2));
+    return `student-${values[0].toString(36)}${values[1].toString(36)}`;
+  } catch {
+    return `student-${Date.now().toString(36)}-${Math.floor(Math.random() * 0xffffff).toString(36)}`;
+  }
+}
+
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
-  navigator.serviceWorker.register("./service-worker.js?v=33", { updateViaCache: "none" }).catch(() => {
+  navigator.serviceWorker.register("./service-worker.js?v=40", { updateViaCache: "none" }).catch(() => {
     appendLog("Offline cache is unavailable; the game still works while connected to this server.");
   });
 }

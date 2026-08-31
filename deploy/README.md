@@ -7,6 +7,13 @@ runtime dependency, or persistent volume. Student code, placements, and attempt
 history stay in the browser; `.maskwamaze` export/import is the portable recovery
 path.
 
+The game includes dormant versioned multiplayer client modules, but this release
+still has no WebSocket service and no `/ws` route. Loading the app does not open a
+socket. Do not point the client at an ad hoc WebSocket server. The authority,
+privacy, ordering, security, two-Chromebook, and rollback gates for a future
+same-origin `wss://mazelab.spatterson.ca/ws` service are specified in
+`game/MULTIPLAYER.md`.
+
 ## Request path and service URL
 
 ```text

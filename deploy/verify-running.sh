@@ -86,7 +86,7 @@ test "$(probe http://mazelab:8080/healthz)" = healthy
 root_body=$(probe http://mazelab:8080/)
 printf '%s\n' "$root_body" | grep -q '<title>Maskwa Maze Lab</title>'
 service_worker_body=$(probe http://mazelab:8080/service-worker.js)
-printf '%s\n' "$service_worker_body" | grep -q 'maskwa-maze-lab-v33'
+printf '%s\n' "$service_worker_body" | grep -q 'maskwa-maze-lab-v40'
 
 root_headers=$(probe_headers http://mazelab:8080/)
 printf '%s\n' "$root_headers" | grep -Eiq 'HTTP/[0-9.]+ 200'

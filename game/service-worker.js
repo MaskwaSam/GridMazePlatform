@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "maskwa-maze-lab-v33";
+const CACHE_NAME = "maskwa-maze-lab-v40";
 const APP_FILES = [
   "./",
   "./index.html",
@@ -13,8 +13,15 @@ const APP_FILES = [
   "./js/level-logic.js",
   "./js/python-runtime.js",
   "./js/python-worker.js",
+  "./js/settings.js",
   "./js/storage.js",
   "./js/levels.js",
+  "./js/game-actions.js",
+  "./js/gamepad.js",
+  "./js/multiplayer-protocol.js",
+  "./js/multiplayer-session.js",
+  "./js/multiplayer-transport.js",
+  "./js/multiplayer-client.js",
   "./levels/straight-start.json",
   "./levels/starter-l.json",
   "./levels/mirror-left.json",
@@ -85,7 +92,7 @@ self.addEventListener("fetch", (event) => {
     fetch(event.request).then((response) => {
       if (response.ok) {
         const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => {});
       }
       return response;
     }).catch(() => cachedFallback(event.request)),

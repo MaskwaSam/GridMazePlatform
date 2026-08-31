@@ -17,12 +17,22 @@ import {
   rollingTransformForMovement,
   shouldAutoRotateView,
   startTileForLevel,
-} from "./level-logic.js?v=32";
+  validatePlayableLevel,
+} from "./level-logic.js?v=36";
 
 const MAX_TICKS_PER_FRAME = 8;
 const ROBOT_MODEL_RADIUS = 18;
 const ROLL_INDICATOR_ARC = Math.PI * 0.32;
 const IDLE_ROTATION_SPEED = 0.5;
+const DEFAULT_FOG = Object.freeze({ near: 850, far: 1450 });
+const DEFAULT_VISUAL_SETTINGS = Object.freeze({
+  idleTour: true,
+  reduceMotion: false,
+  clearView: false,
+  showTrail: true,
+  showImpactMarkers: true,
+  showGrid: true,
+});
 
 export class MazeSimulation {
   constructor(canvas, callbacks = {}) {
@@ -38,6 +48,9 @@ export class MazeSimulation {
     this.lastFrameTime = performance.now();
     this.lastViewActivityTime = this.lastFrameTime;
     this.idleTourEnabled = true;
+    this.visualSettings = { ...DEFAULT_VISUAL_SETTINGS };
+    this.fogDistances = { ...DEFAULT_FOG };
+    this.hasImpactMarker = false;
     this.collisions = 0;
     this.trailPoints = [];
     this.matrix = new Array(64).fill("#000000");
@@ -55,7 +68,7 @@ export class MazeSimulation {
   setupScene() {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0xdcebf1);
-    this.scene.fog = new THREE.Fog(0xdcebf1, 850, 1450);
+    this.scene.fog = new THREE.Fog(0xdcebf1, this.fogDistances.near, this.fogDistances.far);
 
     this.camera = new THREE.PerspectiveCamera(42, 1, 1, 2600);
     this.camera.position.set(520, 480, 540);
@@ -109,6 +122,7 @@ export class MazeSimulation {
   }
 
   async loadLevel(level) {
+    validatePlayableLevel(level);
     this.cancelDrag();
     const loader = new STLLoader();
     const usedPieces = [...new Set(level.tiles.map((tile) => tile.piece))];
@@ -149,6 +163,7 @@ export class MazeSimulation {
       throw error;
     }
 
+    this.fogDistances = { ...DEFAULT_FOG };
     let view = null;
     if (Array.isArray(level.navigationPolygon) && level.navigationPolygon.length) {
       const xs = level.navigationPolygon.map((point) => point.x);
@@ -195,8 +210,7 @@ export class MazeSimulation {
       );
       this.controls.maxDistance = view.maxCameraDistance;
       const fog = mazeFogDistances(view.maxCameraDistance, view.footprintRadius);
-      this.scene.fog.near = fog.near;
-      this.scene.fog.far = fog.far;
+      this.fogDistances = { near: fog.near, far: fog.far };
       this.camera.far = Math.max(2600, fog.far + 500);
       this.camera.updateProjectionMatrix();
       this.ground.position.x = view.centreX;
@@ -213,7 +227,8 @@ export class MazeSimulation {
     this.tray.position.set(level.tray.x, 3, level.tray.z);
     this.trayLabel.position.set(level.tray.x, 18, level.tray.z + 68);
     this.reset(false);
-    this.callbacks.onLoaded?.();
+    this.applyVisualSettings(this.visualSettings);
+    this.emitCallback("onLoaded");
   }
 
   addTray() {
@@ -381,8 +396,20 @@ export class MazeSimulation {
     }
     window.addEventListener("pointermove", this.handleActivePointerMove, { capture: true, passive: true });
     document.addEventListener("visibilitychange", this.handleViewActivity, { passive: true });
-    this.reducedMotionQuery.addEventListener?.("change", this.handleViewActivity);
+    this.handleReducedMotionChange = () => {
+      this.noteViewActivity();
+      this.applyVisualSettings(this.visualSettings);
+    };
+    this.reducedMotionQuery.addEventListener?.("change", this.handleReducedMotionChange);
     this.canvas.dataset.idleRotating = "false";
+  }
+
+  emitCallback(name, ...args) {
+    try {
+      this.callbacks[name]?.(...args);
+    } catch (error) {
+      console.error(`Maze simulation ${name} callback failed.`, error);
+    }
   }
 
   noteViewActivity(time = performance.now()) {
@@ -393,12 +420,16 @@ export class MazeSimulation {
 
   setIdleTourEnabled(enabled) {
     this.idleTourEnabled = Boolean(enabled);
+    this.visualSettings.idleTour = this.idleTourEnabled;
+    this.canvas.dataset.idleTourEnabled = String(this.idleTourEnabled);
     this.noteViewActivity();
     return this.idleTourEnabled;
   }
 
   startIdleTour(time = performance.now()) {
     this.idleTourEnabled = true;
+    this.visualSettings.idleTour = true;
+    this.canvas.dataset.idleTourEnabled = "true";
     this.lastViewActivityTime = time - IDLE_ROTATION_DELAY_MS;
     this.updateIdleRotation(time);
     return this.controls.autoRotate;
@@ -409,7 +440,7 @@ export class MazeSimulation {
     const autoRotate = shouldAutoRotateView(time, this.lastViewActivityTime, {
       moving: Boolean(this.motion),
       dragging: this.dragging,
-      reducedMotion: this.reducedMotionQuery?.matches,
+      reducedMotion: this.isReducedMotionActive(),
       hidden: document.hidden,
       controlsDisabled: !this.controls.enabled,
       tourDisabled: !this.idleTourEnabled,
@@ -417,6 +448,53 @@ export class MazeSimulation {
     if (autoRotate === this.controls.autoRotate) return;
     this.controls.autoRotate = autoRotate;
     this.canvas.dataset.idleRotating = String(autoRotate);
+  }
+
+  isReducedMotionActive() {
+    return Boolean(this.visualSettings.reduceMotion || this.reducedMotionQuery?.matches);
+  }
+
+  applyVisualSettings(settings = {}) {
+    this.visualSettings = {
+      ...DEFAULT_VISUAL_SETTINGS,
+      ...settings,
+      idleTour: Boolean(settings.idleTour ?? DEFAULT_VISUAL_SETTINGS.idleTour),
+      reduceMotion: Boolean(settings.reduceMotion ?? DEFAULT_VISUAL_SETTINGS.reduceMotion),
+      clearView: Boolean(settings.clearView ?? DEFAULT_VISUAL_SETTINGS.clearView),
+      showTrail: Boolean(settings.showTrail ?? DEFAULT_VISUAL_SETTINGS.showTrail),
+      showImpactMarkers: Boolean(settings.showImpactMarkers ?? DEFAULT_VISUAL_SETTINGS.showImpactMarkers),
+      showGrid: Boolean(settings.showGrid ?? DEFAULT_VISUAL_SETTINGS.showGrid),
+    };
+    this.idleTourEnabled = this.visualSettings.idleTour;
+    this.applyFogPreference();
+    if (this.trail) this.trail.visible = this.visualSettings.showTrail;
+    if (this.grid) this.grid.visible = this.visualSettings.showGrid;
+    if (this.collisionMarker) {
+      this.collisionMarker.visible = this.visualSettings.showImpactMarkers && this.hasImpactMarker;
+    }
+    if (!this.idleTourEnabled || this.isReducedMotionActive()) this.noteViewActivity();
+    this.canvas.dataset.idleTourEnabled = String(this.idleTourEnabled);
+    this.canvas.dataset.reduceMotion = String(this.visualSettings.reduceMotion);
+    this.canvas.dataset.reducedMotionActive = String(this.isReducedMotionActive());
+    this.canvas.dataset.clearView = String(this.visualSettings.clearView);
+    this.canvas.dataset.showTrail = String(this.visualSettings.showTrail);
+    this.canvas.dataset.showImpactMarkers = String(this.visualSettings.showImpactMarkers);
+    this.canvas.dataset.showGrid = String(this.visualSettings.showGrid);
+    return { ...this.visualSettings };
+  }
+
+  applyFogPreference() {
+    if (!this.scene) return;
+    if (this.visualSettings.clearView) {
+      this.scene.fog = null;
+      return;
+    }
+    if (!this.scene.fog) {
+      this.scene.fog = new THREE.Fog(0xdcebf1, this.fogDistances.near, this.fogDistances.far);
+      return;
+    }
+    this.scene.fog.near = this.fogDistances.near;
+    this.scene.fog.far = this.fogDistances.far;
   }
 
   endDrag(event = null) {
@@ -460,13 +538,60 @@ export class MazeSimulation {
     this.placed = true;
     this.state = createRobotState(this.level, this.startPose);
     this.collisions = 0;
+    this.hasImpactMarker = false;
     this.collisionMarker.visible = false;
     this.goalMarker && (this.goalMarker.material.emissiveIntensity = 0.62);
     this.clearTrail();
     this.robotSphere.quaternion.identity();
     this.updateRobotTransform();
-    this.callbacks.onPlacement?.(true, { ...this.startPose });
+    this.emitCallback("onPlacement", true, { ...this.startPose });
     this.emitTelemetry();
+  }
+
+  captureSession() {
+    return {
+      placed: this.placed,
+      startPose: this.startPose ? { ...this.startPose } : null,
+      state: { ...this.state },
+      collisions: this.collisions,
+      matrix: [...this.matrix],
+      robotQuaternion: this.robotSphere.quaternion.toArray(),
+      robotColour: this.robotMaterial.color.getHex(),
+      robotEmissive: this.robotMaterial.emissive.getHex(),
+      trailPoints: this.trailPoints.map((point) => point.toArray()),
+      hasImpactMarker: this.hasImpactMarker,
+      goalEmissiveIntensity: this.goalMarker?.material.emissiveIntensity ?? 0.62,
+    };
+  }
+
+  restoreSession(snapshot) {
+    if (!this.level || !snapshot?.state) return false;
+    this.cancelDrag();
+    this.cancelMotion("Level recovery");
+    this.placed = Boolean(snapshot.placed);
+    this.startPose = this.placed && snapshot.startPose ? { ...snapshot.startPose } : null;
+    this.state = { ...snapshot.state };
+    this.collisions = Math.max(0, Number(snapshot.collisions) || 0);
+    this.matrix = Array.isArray(snapshot.matrix) ? [...snapshot.matrix] : new Array(64).fill("#000000");
+    if (Array.isArray(snapshot.robotQuaternion) && snapshot.robotQuaternion.length === 4) {
+      this.robotSphere.quaternion.fromArray(snapshot.robotQuaternion);
+    } else {
+      this.robotSphere.quaternion.identity();
+    }
+    this.robotMaterial.color.setHex(Number(snapshot.robotColour) || 0x59bfff);
+    this.robotMaterial.emissive.setHex(Number(snapshot.robotEmissive) || 0x082f4d);
+    this.trailPoints = Array.isArray(snapshot.trailPoints)
+      ? snapshot.trailPoints.map((point) => new THREE.Vector3().fromArray(point))
+      : [];
+    this.updateTrailGeometry();
+    this.hasImpactMarker = Boolean(snapshot.hasImpactMarker ?? snapshot.collisionMarkerVisible);
+    this.collisionMarker.visible = this.visualSettings.showImpactMarkers && this.hasImpactMarker;
+    if (this.goalMarker) this.goalMarker.material.emissiveIntensity = Number(snapshot.goalEmissiveIntensity) || 0.62;
+    this.fixedAccumulator = 0;
+    this.updateRobotTransform();
+    this.emitCallback("onPlacement", this.placed, this.startPose ? { ...this.startPose } : null);
+    this.emitTelemetry();
+    return true;
   }
 
   returnToTray() {
@@ -479,14 +604,17 @@ export class MazeSimulation {
     });
     this.robotSphere.quaternion.identity();
     this.clearTrail();
+    this.hasImpactMarker = false;
+    this.collisionMarker.visible = false;
     this.updateRobotTransform();
-    this.callbacks.onPlacement?.(false, null);
+    this.emitCallback("onPlacement", false, null);
     this.emitTelemetry();
   }
 
   reset(keepPlaced = true) {
     this.cancelMotion("Reset");
     this.collisions = 0;
+    this.hasImpactMarker = false;
     this.collisionMarker.visible = false;
     this.goalMarker && (this.goalMarker.material.emissiveIntensity = 0.62);
     this.clearTrail();
@@ -499,6 +627,7 @@ export class MazeSimulation {
     this.cancelMotion("New attempt");
     this.clearTrail();
     this.collisions = 0;
+    this.hasImpactMarker = false;
     this.collisionMarker.visible = false;
     this.state = createRobotState(this.level, this.startPose || this.level.start);
     this.robotSphere.quaternion.identity();
@@ -604,8 +733,9 @@ export class MazeSimulation {
     if (after.collision) {
       this.collisions = after.collisions;
       this.collisionMarker.position.set(after.x, this.level.baseTop + 2.4, after.z);
-      this.collisionMarker.visible = true;
-      this.callbacks.onCollision?.(this.collisions, {
+      this.hasImpactMarker = true;
+      this.collisionMarker.visible = this.visualSettings.showImpactMarkers;
+      this.emitCallback("onCollision", this.collisions, {
         x: after.x,
         z: after.z,
         normalX: after.collisionNormalX,
@@ -619,7 +749,7 @@ export class MazeSimulation {
     this.emitTelemetry();
     if (after.goalReached && !before.goalReached) {
       this.goalMarker.material.emissiveIntensity = 2.4;
-      this.callbacks.onGoal?.();
+      this.emitCallback("onGoal");
       if (this.motion) this.motion.stepsRemaining = 0;
     }
   }
@@ -666,6 +796,7 @@ export class MazeSimulation {
   }
 
   rollSphere(movementX, movementZ) {
+    if (this.isReducedMotionActive()) return;
     const roll = rollingTransformForMovement(movementX, movementZ, this.level.robotRadius);
     if (!roll) return;
     const axis = new THREE.Vector3(roll.axisX, 0, roll.axisZ);
@@ -726,7 +857,7 @@ export class MazeSimulation {
   }
 
   emitTelemetry() {
-    this.callbacks.onTelemetry?.({
+    this.emitCallback("onTelemetry", {
       heading: Math.round(this.state.heading),
       speed: Math.round(this.state.actualSpeed),
       commandedSpeed: Math.round(this.state.speed),
@@ -765,9 +896,12 @@ export class MazeSimulation {
     }
 
     if (this.startMarker && this.goalMarker) {
-      const pulse = 0.65 + Math.sin(time * 0.004) * 0.18;
+      const reducedMotion = this.isReducedMotionActive();
+      const pulse = reducedMotion ? 0.65 : 0.65 + Math.sin(time * 0.004) * 0.18;
       this.startMarker.material.opacity = pulse;
-      if (!this.state.goalReached) this.goalMarker.material.opacity = 0.66 + Math.sin(time * 0.005 + 1) * 0.18;
+      if (!this.state.goalReached) {
+        this.goalMarker.material.opacity = reducedMotion ? 0.66 : 0.66 + Math.sin(time * 0.005 + 1) * 0.18;
+      }
     }
     this.renderer.render(this.scene, this.camera);
   }

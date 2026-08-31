@@ -12,12 +12,13 @@ export class PythonRuntime {
     this.bootTimer = null;
     this.runPromise = null;
     this.runSequence = 0;
+    this.programTimeoutMs = PROGRAM_TIMEOUT_MS;
   }
 
   async prepare() {
     if (this.readyPromise) return this.readyPromise;
     this.onState?.("loading");
-    const worker = new Worker(new URL("./python-worker.js?v=32", import.meta.url));
+    const worker = new Worker(new URL("./python-worker.js?v=36", import.meta.url));
     this.worker = worker;
     this.readyPromise = new Promise((resolve, reject) => {
       this.bootReject = reject;
@@ -40,7 +41,7 @@ export class PythonRuntime {
     worker.addEventListener("message", (event) => void this.handleMessage(event.data || {}, worker));
     worker.addEventListener("error", (event) => {
       const error = new Error(event.message || "The Python worker stopped unexpectedly.");
-      this.rejectRun(error);
+      this.terminate(error.message);
     });
     worker.postMessage({ type: "init" });
     return this.readyPromise;
@@ -56,10 +57,8 @@ export class PythonRuntime {
     this.onState?.("running");
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
-        const error = new Error("Program stopped after the 25 second safety limit.");
-        this.terminate();
-        reject(error);
-      }, PROGRAM_TIMEOUT_MS);
+        this.terminate("Program stopped after the 25 second safety limit.");
+      }, this.programTimeoutMs);
       this.runPromise = { runId, resolve, reject, timer };
       this.worker.postMessage({ type: "run", runId, source });
     });

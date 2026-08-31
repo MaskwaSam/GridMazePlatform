@@ -27,6 +27,15 @@ Then open `http://127.0.0.1:8766/` in current Chrome or ChromeOS. Do not open
 caching require HTTP(S). A production static host must serve `.wasm` as
 `application/wasm`.
 
+On a phone, portrait mode presents the maze and Coding Workspace as a compact
+top-to-bottom workflow with a sticky level header and 44 px primary touch
+targets. Narrow screens stack the maze title above its controls so labels stay
+readable. Short landscape screens use a balanced side-by-side view and remove
+nonessential maze overlays so placing the robot remains practical. Safe-area
+insets are respected around notches and home indicators; rotate the device at
+any time and the Three.js and Blockly surfaces resize without discarding student
+work.
+
 The first Python run loads about 11.7 MiB of local Pyodide files. After the
 service worker finishes caching, the game can reload offline from the same
 origin. There are no CDN or external runtime requests.
@@ -103,6 +112,33 @@ new facing the reference for the next command, so a following `roll(0, ...)`
 continues in the direction established by the spin. Telemetry reports the
 resulting world bearing from the original north-facing start.
 
+## Device settings
+
+The header **Settings** menu stores presentation and convenience choices only on
+the current browser device. It includes idle camera tour, reduced motion, a
+fog-free clearer view, travel trail, impact markers, ground grid, and optional
+reset confirmation. It also has an opt-in **Xbox controller** switch. Pair the
+controller in ChromeOS Bluetooth first, return to the game, enable the switch,
+and press any controller button. The status card identifies whether the browser
+is waiting, connected, disconnected, or unsupported and shows the complete
+button map. Controller support starts off and performs no polling while disabled.
+
+The Xbox mapping is A for Place/Run, B for Stop, X for Reset, Y for
+Blocks/Python, View for Attempts, Menu for Settings, and the bumpers or left/right
+D-pad buttons for maze navigation. These buttons operate the game workflow only;
+they never steer the sphere. Robot motion and turning still come exclusively
+from the student's Blocks or Python program, with the same timing and physics.
+
+Defaults keep the tour, trail, impact markers, and grid on;
+the other options start off. Reduced motion changes camera and sphere
+animation only, never timing, collision, bounce, heading, or goal physics.
+
+Settings use their own versioned local-storage record. They are not included in
+student autosaves, attempt history, Export files, or Import, so moving class work
+between Chromebooks cannot silently change a device's accessibility preferences.
+**Restore defaults** changes only these settings and leaves every program and
+attempt untouched.
+
 ## Architecture and safety boundary
 
 - `levels/*.json` describes each X1C route using the three existing STL models,
@@ -133,6 +169,14 @@ resulting world bearing from the original north-facing start.
   versioned portable JSON contract. Imports are size-limited, schema-checked,
   Blockly-validated, staged in memory, and committed with one local-storage
   write only after student confirmation.
+- `js/game-actions.js` is the shared workflow boundary for on-screen and Xbox
+  controller input. `js/gamepad.js` adapts the browser Gamepad API into rising-edge
+  semantic actions without held-button repeats or direct robot steering.
+- The multiplayer protocol, immutable session, transport, and client modules are
+  dormant groundwork for a later authoritative WebSocket service. The current
+  release remains offline by default and opens no socket. See
+  [MULTIPLAYER.md](MULTIPLAYER.md) for the privacy, ordering, authority, and
+  deployment contract.
 
 This is an instructional sandbox, not a security boundary for hostile code.
 The AST restrictions, isolated worker, program limit, and hard timeout reduce
@@ -172,6 +216,8 @@ therefore cannot silently drift away from the logical collision profile.
   on the sphere shell.
 - Python deliberately excludes imports and attribute access, so lessons use the
   provided robot functions and safe core language constructs.
-- No physical-robot connection, accounts, multiplayer, or leaderboard.
+- No physical-robot connection, accounts, live multiplayer server, or
+  leaderboard. Multiplayer-ready client boundaries are present but remain
+  offline until a separately reviewed server is explicitly configured.
 
 See `THIRD_PARTY_NOTICES.md` for local runtime licenses.

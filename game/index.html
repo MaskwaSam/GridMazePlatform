@@ -20,20 +20,26 @@
   <header class="app-header">
     <div>
       <p class="eyebrow" id="level-number">Sphere robotics · maze 01 of 07</p>
-      <h1>Maskwa Maze Lab</h1>
+      <h1 aria-label="Maskwa Maze Lab"><span class="brand-full">Maskwa Maze Lab</span><span class="brand-compact" aria-hidden="true">Maskwa Maze</span></h1>
     </div>
-    <div class="level-navigation">
-      <label for="level-select">Choose maze</label>
-      <select id="level-select" aria-label="Choose maze level">
-        <option value="straight-start">1 · Straight Start — Beginning</option>
-      </select>
-      <div class="level-summary" aria-label="Current level" aria-live="polite">
-        <span class="level-dot" aria-hidden="true"></span>
-        <span>
-          <strong><span id="level-name">Straight Start</span><span class="difficulty-chip" id="level-difficulty">Beginning</span></strong>
-          <small id="level-description">Learn speed and timing by driving straight north to the goal.</small>
-        </span>
+    <div class="header-tools">
+      <div class="level-navigation">
+        <label for="level-select">Choose maze</label>
+        <select id="level-select" aria-label="Choose maze level">
+          <option value="straight-start">1 · Straight Start — Beginning</option>
+        </select>
+        <div class="level-summary" aria-label="Current level" aria-live="polite">
+          <span class="level-dot" aria-hidden="true"></span>
+          <span>
+            <strong><span id="level-name">Straight Start</span><span class="difficulty-chip" id="level-difficulty">Beginning</span></strong>
+            <small id="level-description">Learn speed and timing by driving straight north to the goal.</small>
+          </span>
+        </div>
       </div>
+      <button class="header-settings-button" id="settings-button" type="button" aria-label="Open settings" aria-haspopup="dialog" aria-controls="settings-dialog" title="Open settings">
+        <span class="settings-button-icon" aria-hidden="true">⚙</span>
+        <span class="settings-button-label">Settings</span>
+      </button>
     </div>
   </header>
 
@@ -45,8 +51,8 @@
           <h2 id="maze-heading">The maze</h2>
         </div>
         <div class="scene-actions">
-          <button class="button button-secondary" id="idle-tour-button" type="button" aria-pressed="true" title="Focus the maze and press Ctrl+R to start rotating.">Idle tour: on</button>
-          <button class="button button-secondary" id="place-button" type="button">Place at start center</button>
+          <button class="button button-secondary" id="idle-tour-button" type="button" aria-label="Turn idle tour off" aria-pressed="true" data-mobile-label="Tour on" title="Focus the maze and press Ctrl+R to start rotating.">Idle tour: on</button>
+          <button class="button button-secondary" id="place-button" type="button" aria-label="Place robot at start center" data-mobile-label="Center start">Place at start center</button>
           <button class="button button-secondary fullscreen-button" id="maze-fullscreen-button" type="button" aria-controls="maze-panel" aria-label="Open maze fullscreen" aria-pressed="false" title="Open maze fullscreen"><span aria-hidden="true">⛶</span></button>
         </div>
       </div>
@@ -57,7 +63,7 @@
           <span aria-hidden="true">↔</span> Drop anywhere on the blue START piece. Your release point becomes the start.
           <small><strong>N means North (0°).</strong> It is the robot’s starting forward direction. After a turn, forward follows its new facing.</small>
         </div>
-        <div class="heading-key" aria-label="Robot-relative direction key"><span>FORWARD · 0°</span><span>RIGHT · +90°</span></div>
+        <div class="heading-key" id="heading-key" aria-label="Robot-relative direction key"><span>FORWARD · 0°</span><span>RIGHT · +90°</span></div>
         <div class="loading-card" id="scene-loading" role="status">Loading maze pieces…</div>
       </div>
 
@@ -91,7 +97,7 @@
       <div class="panel-heading studio-heading">
         <div>
           <p class="step-label">2 · Build your solution</p>
-          <h2 id="studio-heading">Coding Workspace</h2>
+          <h2 id="studio-heading" aria-label="Coding Workspace"><span class="studio-title-full">Coding Workspace</span><span class="studio-title-compact" aria-hidden="true">Code</span></h2>
         </div>
         <div class="studio-controls">
           <div class="studio-top-row">
@@ -156,12 +162,85 @@
     <div class="attempt-history-list" id="attempt-history-list"></div>
   </dialog>
 
+  <dialog class="settings-dialog" id="settings-dialog" aria-labelledby="settings-title" aria-describedby="settings-description">
+    <div class="settings-dialog-heading">
+      <div>
+        <p class="step-label">Device preferences</p>
+        <h2 id="settings-title">Settings</h2>
+      </div>
+      <form method="dialog"><button class="dialog-close" type="submit" aria-label="Close settings">×</button></form>
+    </div>
+    <p class="settings-description" id="settings-description">These choices stay on this device. They never change your code, attempt history, imported files, or robot physics.</p>
+    <div class="settings-list">
+      <label class="settings-row" for="setting-idle-tour">
+        <span><strong>Idle camera tour</strong><small>Rotate the maze after 20 seconds without activity.</small></span>
+        <input id="setting-idle-tour" type="checkbox" role="switch">
+      </label>
+      <label class="settings-row" for="setting-reduce-motion">
+        <span><strong>Reduce motion</strong><small>Pause camera rotation and rolling animation while keeping robot movement and physics unchanged.</small></span>
+        <input id="setting-reduce-motion" type="checkbox" role="switch">
+      </label>
+      <label class="settings-row" for="setting-clear-view">
+        <span><strong>Clearer maze view</strong><small>Remove distance fog so larger mazes remain easy to see.</small></span>
+        <input id="setting-clear-view" type="checkbox" role="switch">
+      </label>
+      <label class="settings-row" for="setting-show-trail">
+        <span><strong>Show travel trail</strong><small>Draw the robot’s path while a program runs.</small></span>
+        <input id="setting-show-trail" type="checkbox" role="switch">
+      </label>
+      <label class="settings-row" for="setting-show-impact-markers">
+        <span><strong>Show impact markers</strong><small>Mark the latest wall collision without changing the bounce.</small></span>
+        <input id="setting-show-impact-markers" type="checkbox" role="switch">
+      </label>
+      <label class="settings-row" for="setting-show-grid">
+        <span><strong>Show ground grid</strong><small>Display the measurement grid around the maze.</small></span>
+        <input id="setting-show-grid" type="checkbox" role="switch">
+      </label>
+      <label class="settings-row" for="setting-confirm-reset">
+        <span><strong>Confirm before reset</strong><small>Ask before stopping a run and returning the robot to its chosen start.</small></span>
+        <input id="setting-confirm-reset" type="checkbox" role="switch">
+      </label>
+      <label class="settings-row" for="setting-controller-enabled">
+        <span><strong>Xbox controller</strong><small>Use a paired Bluetooth controller for game controls. Robot movement still comes only from student code.</small></span>
+        <input id="setting-controller-enabled" type="checkbox" role="switch" aria-controls="controller-panel">
+      </label>
+      <section class="controller-panel" id="controller-panel" aria-labelledby="controller-panel-title" hidden>
+        <div class="controller-panel-heading">
+          <span class="controller-symbol" aria-hidden="true">✣</span>
+          <div>
+            <strong id="controller-panel-title">Controller controls</strong>
+            <span class="controller-status" id="controller-status" role="status" aria-live="polite">Controller support is off.</span>
+          </div>
+        </div>
+        <p>Pair the controller in the Chromebook’s Bluetooth settings, return here, and press any controller button. The browser cannot perform Bluetooth pairing for you.</p>
+        <dl class="controller-map" aria-label="Xbox controller button map">
+          <div><dt>A</dt><dd>Place robot / Run</dd></div>
+          <div><dt>B</dt><dd>Stop</dd></div>
+          <div><dt>X</dt><dd>Reset</dd></div>
+          <div><dt>Y</dt><dd>Blocks / Python</dd></div>
+          <div><dt>View</dt><dd>Attempts</dd></div>
+          <div><dt>Menu</dt><dd>Settings</dd></div>
+          <div><dt>LB / ←</dt><dd>Previous maze</dd></div>
+          <div><dt>RB / →</dt><dd>Next maze</dd></div>
+        </dl>
+        <p class="controller-boundary"><strong>Code stays in charge:</strong> the controller never drives or turns the sphere directly.</p>
+      </section>
+    </div>
+    <div class="settings-footer">
+      <span class="settings-status" id="settings-status" role="status" aria-live="polite"></span>
+      <div class="settings-footer-actions">
+        <button class="button button-secondary" id="settings-defaults-button" type="button">Restore defaults</button>
+        <form method="dialog"><button class="button button-run" type="submit">Done</button></form>
+      </div>
+    </div>
+  </dialog>
+
   <noscript>This game requires JavaScript. Ask your teacher to enable JavaScript in Chrome.</noscript>
   <script>
     if ("serviceWorker" in navigator && location.protocol !== "file:") {
-      navigator.serviceWorker.register("./service-worker.js?v=33", { updateViaCache: "none" }).catch(() => {});
+      navigator.serviceWorker.register("./service-worker.js?v=40", { updateViaCache: "none" }).catch(() => {});
     }
   </script>
-  <script type="module" src="./js/main.js?v=32"></script>
+  <script type="module" src="./js/main.js?v=38"></script>
 </body>
 </html>

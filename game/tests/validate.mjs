@@ -20,6 +20,7 @@ import {
   shouldAutoRotateView,
   simulateCommands,
   startTileForLevel,
+  validatePlayableLevel,
   wallSegmentsForLevel,
 } from "../js/level-logic.js";
 import {
@@ -58,7 +59,9 @@ function test(name, callback) {
 const requiredFiles = [
   "index.html", "styles.css", "manifest.webmanifest", "service-worker.js",
   "js/main.js", "js/blocks.js", "js/simulation.js", "js/level-logic.js",
-  "js/python-runtime.js", "js/python-worker.js", "js/storage.js", "js/levels.js",
+  "js/python-runtime.js", "js/python-worker.js", "js/storage.js", "js/levels.js", "js/settings.js",
+  "js/game-actions.js", "js/gamepad.js", "js/multiplayer-protocol.js", "js/multiplayer-session.js",
+  "js/multiplayer-transport.js", "js/multiplayer-client.js",
   ...LEVEL_CATALOG.map((entry) => entry.file.replace(/^\.\//, "")),
   "assets/stl/maze_piece_straight_v1.stl",
   "assets/stl/maze_piece_corner_v1.stl",
@@ -81,8 +84,10 @@ test("HTML exposes the complete accessible game workflow", () => {
   const html = read("index.html");
   const manifest = JSON.parse(read("manifest.webmanifest"));
   assert.match(html, /<title>Maskwa Maze Lab<\/title>/);
-  assert.match(html, /<h1>Maskwa Maze Lab<\/h1>/);
-  assert.match(html, /<h2 id="studio-heading">Coding Workspace<\/h2>/);
+  assert.match(html, /<h1 aria-label="Maskwa Maze Lab">/);
+  assert.match(html, /<h2 id="studio-heading" aria-label="Coding Workspace">/);
+  assert.match(html, /class="brand-compact" aria-hidden="true">Maskwa Maze<\/span>/);
+  assert.match(html, /class="studio-title-compact" aria-hidden="true">Code<\/span>/);
   assert.match(html, /Open Coding Workspace fullscreen/);
   assert.match(html, /accept="\.json,\.maskwamaze,\.mazebot,application\/json"/);
   assert.equal(manifest.name, "Maskwa Maze Lab");
@@ -94,6 +99,10 @@ test("HTML exposes the complete accessible game workflow", () => {
     "program-log", "success-banner", "level-select", "next-level-button",
     "save-work-button", "attempt-history-button", "export-work-button", "import-work-button",
     "import-work-file", "save-status", "attempt-history-dialog", "attempt-history-list",
+    "settings-button", "settings-dialog", "settings-status", "settings-defaults-button",
+    "setting-idle-tour", "setting-reduce-motion", "setting-clear-view", "setting-show-trail",
+    "setting-show-impact-markers", "setting-show-grid", "setting-confirm-reset",
+    "setting-controller-enabled", "controller-panel", "controller-status",
   ]) {
     assert.match(html, new RegExp(`id=["']${id}["']`), `missing #${id}`);
   }
@@ -134,6 +143,163 @@ test("every authored runtime reference is local and exists", () => {
   }
 });
 
+test("phone portrait and short-landscape layouts keep controls touchable and the game visible", () => {
+  const html = read("index.html");
+  const css = read("styles.css");
+  const main = read("js/main.js");
+  const landscapeStart = css.indexOf("@media (max-width: 920px) and (orientation: landscape) and (max-height: 520px)");
+  const compactLandscapeStart = css.indexOf("@media (max-width: 620px) and (orientation: landscape) and (max-height: 520px)");
+  const landscapeCss = css.slice(landscapeStart, compactLandscapeStart);
+  const compactLandscapeCss = css.slice(compactLandscapeStart, css.indexOf("@media (prefers-reduced-motion: reduce)"));
+  assert.match(html, /id="idle-tour-button"[^>]+data-mobile-label="Tour on"/);
+  assert.match(html, /id="place-button"[^>]+data-mobile-label="Center start"/);
+  assert.match(html, /id="idle-tour-button"[^>]+aria-label="Turn idle tour off"/);
+  assert.match(html, /id="place-button"[^>]+aria-label="Place robot at start center"/);
+  assert.match(css, /env\(safe-area-inset-bottom\)/);
+  assert.match(css, /--app-header-height: 84px/);
+  assert.match(css, /height: calc\(100dvh - var\(--app-header-height\) - env\(safe-area-inset-top\)\)/);
+  assert.match(css, /@media \(max-width: 620px\)/);
+  assert.match(css, /@media \(max-width: 920px\) and \(orientation: landscape\) and \(max-height: 520px\)/);
+  assert.match(css, /grid-template-columns: minmax\(0, 0\.92fr\) minmax\(0, 1\.08fr\)/);
+  assert.match(css, /grid-template-rows: minmax\(480px, 62dvh\) minmax\(610px, 84dvh\)/);
+  assert.match(css, /@media \(max-width: 360px\) and \(orientation: portrait\)[\s\S]*?\.scene-heading \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\)/);
+  assert.match(css, /\.work-button \{[^}]*min-height: 44px;/);
+  assert.match(css, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(css, /\.blocklyTreeRow \{ height: 42px !important;/);
+  assert.match(css, /\.dialog-close \{[^}]*min-width: 44px;[^}]*min-height: 44px;/);
+  assert.match(landscapeCss, /#level-select \{[^}]*min-height: 44px;/);
+  assert.match(landscapeCss, /\.fullscreen-button \{[^}]*min-height: 44px;/);
+  assert.match(landscapeCss, /\.run-bar > \.button \{[^}]*min-height: 44px;/);
+  assert.match(landscapeCss, /\.editor-tab \{[^}]*min-height: 44px;/);
+  assert.match(landscapeCss, /\.work-button \{[^}]*min-height: 44px;/);
+  assert.match(landscapeCss, /\.heading-key \{ display: none; \}/);
+  assert.match(css, /max-width: calc\(100vw - env\(safe-area-inset-left\) - env\(safe-area-inset-right\) - 0\.75rem\)/);
+  assert.match(css, /max-height: calc\(100dvh - env\(safe-area-inset-top\) - env\(safe-area-inset-bottom\) - 0\.75rem\)/);
+  assert.match(css, /inset-block-start: env\(safe-area-inset-top\)/);
+  assert.match(compactLandscapeCss, /\.run-bar > \.button \{[^}]*min-width: 44px;[^}]*font-size: 0\.72rem;/);
+  assert.match(compactLandscapeCss, /\.scene-actions \.button:not\(\.fullscreen-button\) \{ min-width: 44px; \}/);
+  assert.match(compactLandscapeCss, /\.attempt-readout \{ display: none; \}/);
+  assert.doesNotMatch(compactLandscapeCss, /\.run-bar > \.button \{[^}]*font-size: 0;/);
+  assert.match(css, /position: sticky;/);
+  assert.doesNotMatch(css, /isolation:\s*isolate/);
+  assert.match(main, /window\.addEventListener\("orientationchange", scheduleInteractiveResize/);
+  assert.match(main, /window\.visualViewport\?\.addEventListener\("resize", scheduleInteractiveResize/);
+  assert.match(main, /const stateLabel = paused \? "paused" : enabled \? "on" : "off"/);
+  assert.match(main, /dataset\.mobileLabel = `Tour \$\{stateLabel\}`/);
+  assert.match(css, /\.header-settings-button \{[\s\S]*?min-height: 44px;/);
+  assert.match(css, /\.settings-footer-actions \.button \{ min-height: 44px;/);
+});
+
+test("device settings are persistent, accessible, and separate from student projects", () => {
+  const html = read("index.html");
+  const css = read("styles.css");
+  const main = read("js/main.js");
+  const simulation = read("js/simulation.js");
+  const settings = read("js/settings.js");
+  const storage = read("js/storage.js");
+  const stateRecordSource = main.slice(main.indexOf("function currentStateRecord"), main.indexOf("function currentCode"));
+  const settingsBehavior = spawnSync(process.execPath, [path.join(testsDir, "settings.mjs")], { encoding: "utf8" });
+
+  assert.equal(settingsBehavior.status, 0, `${settingsBehavior.stdout}\n${settingsBehavior.stderr}`);
+  assert.match(settingsBehavior.stdout, /PASS settings defaults, normalization, persistence, and storage failures/);
+  assert.match(settings, /maskwa-maze-lab-settings-v1/);
+  assert.match(settings, /schemaVersion: SETTINGS_SCHEMA_VERSION/);
+  assert.doesNotMatch(storage, /maskwa-maze-lab-settings|settings\.js/);
+  assert.doesNotMatch(stateRecordSource, /userSettings|confirmReset|clearView/);
+  assert.match(html, /id="settings-button"[^>]+aria-haspopup="dialog"[^>]+aria-controls="settings-dialog"/);
+  assert.match(html, /id="settings-dialog"[^>]+aria-labelledby="settings-title"[^>]+aria-describedby="settings-description"/);
+  assert.equal((html.match(/class="settings-row"/g) || []).length, 8);
+  assert.equal((html.match(/type="checkbox" role="switch"/g) || []).length, 8);
+  assert.match(html, /never change your code, attempt history, imported files, or robot physics/i);
+  for (const key of ["idleTour", "reduceMotion", "clearView", "showTrail", "showImpactMarkers", "showGrid", "confirmReset", "controllerEnabled"]) {
+    assert.match(main, new RegExp(`${key}: \\"setting-`));
+  }
+  assert.match(main, /saveSettings\(userSettings\)/);
+  assert.match(main, /function requestReset\(\)[\s\S]*userSettings\.confirmReset[\s\S]*window\.confirm/);
+  assert.match(simulation, /applyVisualSettings\(settings = \{\}\)/);
+  assert.match(simulation, /this\.scene\.fog = null/);
+  assert.match(simulation, /this\.trail\.visible = this\.visualSettings\.showTrail/);
+  assert.match(simulation, /this\.grid\.visible = this\.visualSettings\.showGrid/);
+  assert.match(simulation, /this\.visualSettings\.showImpactMarkers && this\.hasImpactMarker/);
+  assert.match(simulation, /rollSphere\(movementX, movementZ\) \{\s*if \(this\.isReducedMotionActive\(\)\) return;/);
+  assert.match(css, /\.settings-row input\[role="switch"\]/);
+  assert.match(css, /html\[data-reduce-motion="true"\]/);
+});
+
+test("opt-in Xbox controls share the on-screen action boundary without steering the robot", () => {
+  const html = read("index.html");
+  const main = read("js/main.js");
+  const gamepad = read("js/gamepad.js");
+  const actions = read("js/game-actions.js");
+  const settings = read("js/settings.js");
+  const gamepadBehavior = spawnSync(process.execPath, [path.join(testsDir, "gamepad.mjs")], { encoding: "utf8" });
+  const actionBehavior = spawnSync(process.execPath, [path.join(testsDir, "game-actions.mjs")], { encoding: "utf8" });
+
+  assert.equal(gamepadBehavior.status, 0, `${gamepadBehavior.stdout}\n${gamepadBehavior.stderr}`);
+  assert.match(gamepadBehavior.stdout, /PASS gamepad adapter lifecycle, mappings, edge handling, gating, reconnect, and deadzone/);
+  assert.equal(actionBehavior.status, 0, `${actionBehavior.stdout}\n${actionBehavior.stderr}`);
+  assert.match(actionBehavior.stdout, /PASS game actions normalize, route, isolate UI-only actions, and surface failures/);
+  assert.match(settings, /controllerEnabled: false/);
+  assert.match(html, /id="setting-controller-enabled"[^>]+role="switch"[^>]+aria-controls="controller-panel"/);
+  assert.match(html, /id="controller-panel"[^>]+hidden/);
+  for (const label of ["Place robot / Run", "Stop", "Reset", "Blocks / Python", "Attempts", "Settings", "Previous maze", "Next maze"]) {
+    assert.ok(html.includes(label), `missing controller mapping: ${label}`);
+  }
+  assert.match(html, /controller never drives or turns the sphere directly/i);
+  assert.match(main, /createGamepadController\(\{/);
+  assert.match(main, /onAction: handleGamepadAction/);
+  assert.match(main, /shouldHandleInput: shouldHandleGamepadInput/);
+  assert.match(main, /gamepadController\?\.setEnabled\(userSettings\.controllerEnabled\)/);
+  assert.match(main, /actionRouter\.register\(GAME_ACTION_KINDS\.RUN/);
+  assert.match(main, /dispatchGameAction\(GAME_ACTION_KINDS\.RUN/);
+  const runAgainHandler = main.slice(
+    main.indexOf("actionRouter.register(GAME_ACTION_KINDS.RUN_AGAIN"),
+    main.indexOf("actionRouter.register(GAME_ACTION_KINDS.TOGGLE_EDITOR"),
+  );
+  assert.match(runAgainHandler, /const source = prepareProgramSource\(\);\s*if \(source === null\) return false;/);
+  assert.ok(
+    runAgainHandler.indexOf("prepareProgramSource()") < runAgainHandler.indexOf("resetAttempt()"),
+    "Run again must preflight code before resetting a solved attempt",
+  );
+  const gamepadHandler = main.slice(main.indexOf("function handleGamepadAction"), main.indexOf("function shouldHandleGamepadInput"));
+  assert.doesNotMatch(gamepadHandler, /simulation|executeRpc|roll\(|spin\(/);
+  assert.doesNotMatch(gamepad, /simulation|executeRpc|localStorage|WebSocket/);
+  assert.match(actions, /OPEN_SETTINGS: "open-settings"/);
+});
+
+test("multiplayer groundwork is strict, private, command-routed, and offline by default", () => {
+  const main = read("js/main.js");
+  const client = read("js/multiplayer-client.js");
+  const transport = read("js/multiplayer-transport.js");
+  const protocol = read("js/multiplayer-protocol.js");
+  const serviceWorker = read("service-worker.js");
+  const multiplayerDocs = read("MULTIPLAYER.md");
+  const behavior = spawnSync(process.execPath, [path.join(testsDir, "multiplayer.mjs")], { encoding: "utf8" });
+
+  assert.equal(behavior.status, 0, `${behavior.stdout}\n${behavior.stderr}`);
+  assert.match(behavior.stdout, /PASS multiplayer protocol, offline\/loopback\/WebSocket transports, sequencing, privacy, and command authority/);
+  assert.match(main, /createMultiplayerClient\(\{/);
+  assert.match(main, /executeLocalCommand: \(method, args\) => simulation\.executeRpc\(method, args\)/);
+  assert.match(main, /onRpc: \(method, args\) => multiplayerClient\.executeRobotCommand\(\{ method, args \}\)/);
+  assert.match(main, /actionRouter\.subscribe\(\(action\) =>/);
+  assert.match(main, /!isShareableGameAction\(action\)/);
+  assert.doesNotMatch(main, /new WebSocket|wss?:\/\//);
+  assert.match(client, /transport = new OfflineTransport\(\)/);
+  assert.match(client, /Server command authority requires a validated server-authority room snapshot/);
+  assert.match(client, /Private field cannot cross the multiplayer boundary/);
+  assert.match(transport, /only connect\(endpoint\)[\s\S]*constructs a socket/i);
+  assert.match(transport, /messages sent while not open[\s\S]*never queued or replayed/i);
+  assert.match(protocol, /MAX_MULTIPLAYER_MESSAGE_BYTES = 65_536/);
+  assert.match(protocol, /Multiplayer requires wss, except for localhost development/);
+  for (const module of [
+    "game-actions", "gamepad", "multiplayer-protocol", "multiplayer-session",
+    "multiplayer-transport", "multiplayer-client",
+  ]) assert.match(serviceWorker, new RegExp(`"\\./js/${module}\\.js"`), `${module} is not cached offline`);
+  assert.match(multiplayerDocs, /does \*\*not\*\* expose `\/ws`/);
+  assert.match(multiplayerDocs, /It must never carry:[\s\S]*Python source/);
+  assert.match(multiplayerDocs, /server is authoritative for room membership, ordering, committed actions/);
+});
+
 test("all authored JavaScript parses in Node", () => {
   const scripts = ["service-worker.js", ...fs.readdirSync(path.join(root, "js")).filter((file) => file.endsWith(".js")).map((file) => `js/${file}`)];
   for (const script of scripts) {
@@ -167,7 +333,11 @@ test("Python runs in a terminating worker with only allowlisted robot RPC", () =
   assert.match(read("js/simulation.js"), /setLed\(\.\.\.args\)/);
   assert.match(runtime, /new Worker/);
   assert.match(runtime, /PROGRAM_TIMEOUT_MS = 25_000/);
-  assert.match(runtime, /\.terminate\(\)/);
+  assert.match(runtime, /this\.terminate\("Program stopped after the 25 second safety limit\."\)/);
+  assert.match(runtime, /worker\.addEventListener\("error"[\s\S]*this\.terminate\(error\.message\)/);
+  const behavior = spawnSync(process.execPath, [path.join(testsDir, "python-runtime.mjs")], { encoding: "utf8" });
+  assert.equal(behavior.status, 0, `${behavior.stdout}\n${behavior.stderr}`);
+  assert.match(behavior.stdout, /PASS Python runtime rejects boot, timeout, and worker crashes promptly/);
 });
 
 test("per-level saves preserve v2 work and isolate v3 programs without executing v1 controls", () => {
@@ -584,16 +754,20 @@ test("the ordered catalogue, picker, next action, and offline cache cover every 
   const serviceWorker = read("service-worker.js");
   assert.match(main, /switchLevel/);
   assert.doesNotMatch(main, /fetch\("\.\/levels\/starter-l\.json"/);
-  assert.match(serviceWorker, /maskwa-maze-lab-v33/);
-  assert.match(main, /register\("\.\/service-worker\.js\?v=33", \{ updateViaCache: "none" \}\)/);
+  assert.match(serviceWorker, /maskwa-maze-lab-v40/);
+  assert.match(main, /register\("\.\/service-worker\.js\?v=40", \{ updateViaCache: "none" \}\)/);
   const html = read("index.html");
-  assert.match(html, /register\("\.\/service-worker\.js\?v=33", \{ updateViaCache: "none" \}\)/);
-  assert.match(html, /src="\.\/js\/main\.js\?v=32"/);
-  assert.match(main, /from "\.\/simulation\.js\?v=32"/);
-  assert.match(main, /from "\.\/blocks\.js\?v=32"/);
+  assert.match(html, /register\("\.\/service-worker\.js\?v=40", \{ updateViaCache: "none" \}\)/);
+  assert.match(html, /src="\.\/js\/main\.js\?v=38"/);
+  assert.match(main, /from "\.\/simulation\.js\?v=36"/);
+  assert.match(main, /from "\.\/blocks\.js\?v=36"/);
+  assert.match(main, /from "\.\/settings\.js\?v=36"/);
+  assert.match(main, /from "\.\/multiplayer-client\.js\?v=37"/);
+  assert.match(serviceWorker, /"\.\/js\/settings\.js"/);
   assert.match(serviceWorker, /caches\.match\(request, \{ ignoreSearch: true \}\)/);
   assert.match(serviceWorker, /request\.mode === "navigate"/);
   assert.match(serviceWorker, /caches\.match\("\.\/index\.html", \{ ignoreSearch: true \}\)/);
+  assert.match(serviceWorker, /cache\.put\(event\.request, copy\)\)\.catch\(\(\) => \{\}\)/);
   for (const entry of LEVEL_CATALOG) {
     const relative = entry.file.replace(/^\.\//, "");
     assert.ok(exists(relative), `${entry.id}: missing catalogue file`);
@@ -619,6 +793,10 @@ test("level replacement is transactional and releases prior WebGL resources", ()
   const main = read("js/main.js");
   const simulation = read("js/simulation.js");
   assert.match(simulation, /Promise\.allSettled/);
+  assert.ok(
+    simulation.indexOf("validatePlayableLevel(level)") < simulation.indexOf("const loader = new STLLoader()"),
+    "malformed levels must fail before any replacement assets are committed",
+  );
   assert.match(simulation, /disposeObject3D\(nextMazeGroup\)/);
   assert.match(simulation, /disposeObject3D\(previousMazeGroup\)/);
   assert.ok(
@@ -628,6 +806,20 @@ test("level replacement is transactional and releases prior WebGL resources", ()
   assert.match(main, /const previousLevel = level/);
   assert.match(main, /level = previousLevel/);
   assert.match(main, /Staying on \$\{level\.name\}/);
+  assert.match(main, /simulation\.level\?\.id !== previousLevel\.id/);
+  assert.match(main, /await simulation\.loadLevel\(previousLevel\)/);
+  assert.match(main, /const previousState = cloneLevelStateRecord/);
+  assert.match(main, /const previousSimulationSession = simulation\.captureSession\(\)/);
+  assert.match(main, /statePersistenceSuspended = true/);
+  assert.match(main, /statePersistenceSuspended = false;[\s\S]*if \(!persistState\(\)\)/);
+  assert.match(main, /restoreProgramsFromState\(previousState\)/);
+  assert.match(main, /simulation\.restoreSession\(previousSimulationSession\)/);
+  assert.match(main, /if \(statePersistenceSuspended\) return;/);
+  assert.match(main, /levelLoading = recoveryFailed/);
+  assert.match(simulation, /captureSession\(\) \{/);
+  assert.match(simulation, /restoreSession\(snapshot\) \{/);
+  assert.match(simulation, /this\.emitCallback\("onLoaded"\)/);
+  assert.match(simulation, /Maze simulation \$\{name\} callback failed/);
 });
 
 test("stopped-goal success terminates runaway Python and survives its rejection", () => {
@@ -700,7 +892,16 @@ test("students can choose an exact collision-safe start anywhere on the first pr
 
     const tooCloseToWallX = Number(startTile.x) + 70;
     assert.equal(isStartPlacementAllowed(authored, tooCloseToWallX, startTile.z), false, `${authored.id}: wall-overlapping drop accepted`);
+
+    const reordered = { ...authored, tiles: [...authored.tiles.slice(1), authored.tiles[0]] };
+    assert.equal(startTileForLevel(reordered).x, startTile.x, `${authored.id}: START depends on tile ordering`);
+    assert.equal(startTileForLevel(reordered).z, startTile.z, `${authored.id}: START depends on tile ordering`);
+    assert.equal(isStartPlacementAllowed(reordered, authored.start.x, authored.start.z), true, `${authored.id}: reordered START was rejected`);
+    assert.equal(validatePlayableLevel(reordered), reordered);
   }
+
+  const malformed = { ...authoredLevels[0], tray: { x: Number.NaN, z: 0 } };
+  assert.throws(() => validatePlayableLevel(malformed), /robot tray is invalid/);
 
   assert.match(simulation, /isStartPlacementAllowed\(this\.level, dropPose\.x, dropPose\.z\)/);
   assert.match(simulation, /new THREE\.SphereGeometry\(ROBOT_MODEL_RADIUS, 36, 24\)/);
@@ -709,7 +910,7 @@ test("students can choose an exact collision-safe start anywhere on the first pr
   assert.match(simulation, /this\.startPose = \{/);
   assert.match(simulation, /this\.placeOnStart\(this\.startPose\)/);
   assert.match(simulation, /createRobotState\(this\.level, this\.startPose \|\| this\.level\.start\)/);
-  assert.match(simulation, /onPlacement\?\.\(true, \{ \.\.\.this\.startPose \}\)/);
+  assert.match(simulation, /this\.emitCallback\("onPlacement", true, \{ \.\.\.this\.startPose \}\)/);
   assert.match(simulation, /cancelDrag\(\) \{/);
   assert.match(simulation, /this\.controls\.enabled = true/);
   assert.doesNotMatch(simulation, /snapRadius/);
@@ -754,7 +955,8 @@ test("the camera starts a reduced-motion-safe idle tour after 20 seconds", () =>
   assert.match(simulation, /setIdleTourEnabled\(enabled\)/);
   assert.match(simulation, /data(?:set)?\.idleRotating|dataset\.idleRotating/);
   const main = read("js/main.js");
-  assert.match(main, /simulation\.setIdleTourEnabled\(!simulation\.idleTourEnabled\)/);
+  assert.match(main, /idleTour: !userSettings\.idleTour/);
+  assert.match(main, /applyUserSettings\(\{ persist: true \}\)/);
   assert.match(main, /setAttribute\("aria-pressed", String\(enabled\)\)/);
 });
 

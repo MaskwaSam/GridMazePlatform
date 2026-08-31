@@ -124,11 +124,28 @@ export function createRobotState(level, pose = level.start) {
 }
 
 export function startTileForLevel(level) {
-  const tile = Array.isArray(level?.tiles) ? level.tiles[0] : null;
+  const tiles = Array.isArray(level?.tiles) ? level.tiles : [];
   const tileSize = Number(level?.tileSize);
-  if (!tile || !Number.isFinite(tileSize) || tileSize <= 0) return null;
-  if (![tile.x, tile.z].every((value) => Number.isFinite(Number(value)))) return null;
-  return tile;
+  if (!tiles.length || !Number.isFinite(tileSize) || tileSize <= 0) return null;
+  const validTiles = tiles.filter((tile) => (
+    tile && [tile.x, tile.z].every((value) => Number.isFinite(Number(value)))
+  ));
+  if (!validTiles.length) return null;
+
+  const startX = Number(level?.start?.x);
+  const startZ = Number(level?.start?.z);
+  if (!Number.isFinite(startX) || !Number.isFinite(startZ)) return validTiles[0];
+  const half = tileSize / 2 + POSITION_EPSILON;
+  const containing = validTiles.filter((tile) => {
+    const local = tileLocalPoint(tile, startX, startZ);
+    return Math.abs(local.x) <= half && Math.abs(local.z) <= half;
+  });
+  const candidates = containing.length ? containing : validTiles;
+  return candidates.reduce((nearest, tile) => {
+    const distance = (startX - Number(tile.x)) ** 2 + (startZ - Number(tile.z)) ** 2;
+    const nearestDistance = (startX - Number(nearest.x)) ** 2 + (startZ - Number(nearest.z)) ** 2;
+    return distance < nearestDistance ? tile : nearest;
+  });
 }
 
 export function isStartPlacementAllowed(level, x, z, radius = level?.robotRadius) {
@@ -139,15 +156,52 @@ export function isStartPlacementAllowed(level, x, z, radius = level?.robotRadius
   if (!tile || !Number.isFinite(positionX) || !Number.isFinite(positionZ)) return false;
 
   const half = tileSize / 2;
-  const tileX = Number(tile.x);
-  const tileZ = Number(tile.z);
+  const local = tileLocalPoint(tile, positionX, positionZ);
   const insideStartingPiece = (
-    positionX >= tileX - half - POSITION_EPSILON &&
-    positionX <= tileX + half + POSITION_EPSILON &&
-    positionZ >= tileZ - half - POSITION_EPSILON &&
-    positionZ <= tileZ + half + POSITION_EPSILON
+    local.x >= -half - POSITION_EPSILON &&
+    local.x <= half + POSITION_EPSILON &&
+    local.z >= -half - POSITION_EPSILON &&
+    local.z <= half + POSITION_EPSILON
   );
   return insideStartingPiece && isPositionAllowed(level, positionX, positionZ, radius);
+}
+
+export function validatePlayableLevel(level) {
+  const id = typeof level?.id === "string" && level.id ? level.id : "unknown";
+  const fail = (message) => { throw new Error(`Invalid maze level ${id}: ${message}`); };
+  const isRecord = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  const finitePoint = (value) => isRecord(value) && Number.isFinite(Number(value.x)) && Number.isFinite(Number(value.z));
+  const positive = (value) => Number.isFinite(Number(value)) && Number(value) > 0;
+
+  if (!isRecord(level)) fail("level data is missing.");
+  if (!Array.isArray(level.tiles) || !level.tiles.length) fail("printable pieces are missing.");
+  if (!positive(level.tileSize)) fail("tile size must be positive.");
+  if (!Number.isFinite(Number(level.baseTop))) fail("base height is invalid.");
+  if (!positive(level.robotRadius) || Number(level.robotRadius) >= Number(level.tileSize) / 2) fail("robot radius is invalid.");
+  if (!finitePoint(level.start) || !Number.isFinite(Number(level.start.heading))) fail("starting pose is invalid.");
+  if (!finitePoint(level.goal) || !positive(level.goal.radius)) fail("goal is invalid.");
+  if (!finitePoint(level.tray)) fail("robot tray is invalid.");
+  if (!Array.isArray(level.navigationPolygon) || level.navigationPolygon.length < 3 || !level.navigationPolygon.every(finitePoint)) {
+    fail("navigation boundary is invalid.");
+  }
+  if (!isRecord(level.assets)) fail("STL asset map is missing.");
+  for (const [index, tile] of level.tiles.entries()) {
+    if (
+      !isRecord(tile) || typeof tile.piece !== "string" || !tile.piece ||
+      !finitePoint(tile) || !Number.isFinite(Number(tile.yawDegrees))
+    ) fail(`printable piece ${index + 1} is invalid.`);
+    if (typeof level.assets[tile.piece] !== "string" || !level.assets[tile.piece]) {
+      fail(`STL asset for ${tile.piece} is missing.`);
+    }
+  }
+  if (!startTileForLevel(level)) fail("starting piece is missing.");
+  if (!isStartPlacementAllowed(level, Number(level.start.x), Number(level.start.z), Number(level.robotRadius))) {
+    fail("starting pose is not collision-safe on its printable piece.");
+  }
+  if (!isPositionAllowed(level, Number(level.goal.x), Number(level.goal.z), Number(level.robotRadius))) {
+    fail("goal is not collision-safe.");
+  }
+  return level;
 }
 
 export function wallSegmentsForLevel(level) {
@@ -547,6 +601,18 @@ function transformTilePoint(tile, x, z) {
   return {
     x: finiteNumber(tile.x) + cosine * x + sine * z,
     z: finiteNumber(tile.z) - sine * x + cosine * z,
+  };
+}
+
+function tileLocalPoint(tile, x, z) {
+  const radians = finiteNumber(tile.yawDegrees) * Math.PI / 180;
+  const cosine = Math.cos(radians);
+  const sine = Math.sin(radians);
+  const deltaX = finiteNumber(x) - finiteNumber(tile.x);
+  const deltaZ = finiteNumber(z) - finiteNumber(tile.z);
+  return {
+    x: cosine * deltaX - sine * deltaZ,
+    z: sine * deltaX + cosine * deltaZ,
   };
 }
 

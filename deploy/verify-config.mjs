@@ -53,7 +53,7 @@ check("runtime payload is explicit, complete, and symlink-free", () => {
   const visit = (current = "") => {
     for (const entry of fs.readdirSync(path.join(root, "game", current), { withFileTypes: true })) {
       const relative = path.posix.join(current, entry.name);
-      if (relative === "README.md" || relative === "tests") continue;
+      if (relative === "README.md" || relative === "MULTIPLAYER.md" || relative === "tests") continue;
       if (entry.isSymbolicLink()) throw new Error(`runtime symlink is not allowed: ${relative}`);
       if (entry.isDirectory()) visit(relative);
       else if (entry.isFile()) actualFiles.push(relative);
@@ -70,6 +70,7 @@ check("runtime payload is explicit, complete, and symlink-free", () => {
   ]) assert.ok(files.includes(required), `missing ${required}`);
   assert.ok(!files.some((file) => file.startsWith("tests/")));
   assert.ok(!files.includes("README.md"));
+  assert.ok(!files.includes("MULTIPLAYER.md"));
 });
 
 check("Docker build is pinned, identity-bound, non-root, and excludes development files", () => {
@@ -82,6 +83,7 @@ check("Docker build is pinned, identity-bound, non-root, and excludes developmen
   assert.doesNotMatch(dockerfile, /^COPY game \/tmp\/mazelab-game$/m);
   assert.match(dockerfile, /^COPY game\/js\/ \/tmp\/mazelab-game\/js\/$/m);
   assert.match(dockerfile, /test ! -e \/tmp\/mazelab-game\/tests/);
+  assert.doesNotMatch(dockerfile, /COPY game\/MULTIPLAYER\.md/);
   assert.match(dockerfile, /USER 101:101/);
   const dockerignore = read(".dockerignore");
   assert.match(dockerignore, /^\*$/m);
@@ -130,6 +132,20 @@ check("security policy permits the local Python worker but blocks external origi
   assert.match(headers, /X-Maskwa-Maze-Lab-Production "1"/);
   assert.match(workerHeaders, /script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'/);
   assert.match(read("deploy/nginx.conf"), /location = \/js\/python-worker\.js[\s\S]*mazelab-worker-security\.conf/);
+});
+
+check("offline cache and release probes use one version", () => {
+  const serviceWorker = read("game/service-worker.js");
+  const html = read("game/index.html");
+  const main = read("game/js/main.js");
+  const runningVerifier = read("deploy/verify-running.sh");
+  const match = serviceWorker.match(/const CACHE_NAME = "maskwa-maze-lab-(v\d+)"/);
+  assert.ok(match, "service-worker cache version is missing");
+  const version = match[1];
+  const queryVersion = version.slice(1);
+  assert.match(html, new RegExp(`service-worker\\.js\\?v=${queryVersion}`));
+  assert.match(main, new RegExp(`service-worker\\.js\\?v=${queryVersion}`));
+  assert.ok(runningVerifier.includes(`maskwa-maze-lab-${version}`), "running verifier expects a stale cache version");
 });
 
 const failed = checks.filter((entry) => !entry.ok);
