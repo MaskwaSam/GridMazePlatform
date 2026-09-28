@@ -1,3 +1,6 @@
 .DS_Store
 __pycache__/
 *.py[cod]
+
+# Keep the original camera file local; the metadata-free preview is shared.
+reference/photos/IMG_6221.HEIC

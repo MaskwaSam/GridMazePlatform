@@ -1,0 +1,1235 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grid Maze Piece Catalog</title>
+  <script>document.documentElement.classList.add('js');</script>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17202a;
+      --muted: #5d6772;
+      --paper: #fbfaf7;
+      --panel: #ffffff;
+      --line: #d9ddd8;
+      --platform: #bd3a36;
+      --platform-soft: #f5d7d5;
+      --wall: #f7f5ef;
+      --wall-edge: #25303a;
+      --open: #237a57;
+      --accent: #275d78;
+      --shadow: 0 14px 36px rgba(25, 34, 40, 0.09);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font: 17px/1.55 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    a { color: var(--accent); }
+
+    header, main, footer {
+      width: min(1180px, calc(100% - 36px));
+      margin-inline: auto;
+    }
+
+    header { padding: 58px 0 30px; }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--accent);
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3 { line-height: 1.13; }
+    h1 { max-width: 850px; margin: 0; font-size: clamp(2.35rem, 6vw, 4.7rem); }
+    h2 { margin: 0 0 14px; font-size: clamp(1.75rem, 4vw, 2.5rem); }
+    h3 { margin: 0; font-size: 1.45rem; }
+    p { margin: 0 0 1em; }
+
+    .lede {
+      max-width: 820px;
+      margin: 22px 0 0;
+      color: var(--muted);
+      font-size: 1.18rem;
+    }
+
+    .facts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    .fact {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--panel);
+      padding: 8px 13px;
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    [hidden] { display: none !important; }
+
+    .catalog-controls {
+      display: none;
+      position: sticky;
+      top: 12px;
+      z-index: 20;
+      margin: 0 0 42px;
+      border: 1px solid #bdc9cf;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 12px 32px rgba(25, 34, 40, 0.14);
+      padding: 18px;
+      backdrop-filter: blur(12px);
+    }
+
+    .js .catalog-controls { display: block; }
+
+    .filter-layout {
+      display: grid;
+      grid-template-columns: minmax(230px, 1.1fr) minmax(0, 1.9fr);
+      gap: 16px 22px;
+      align-items: end;
+    }
+
+    .search-field label,
+    .filter-set legend {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 850;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    .search-field label { display: block; margin-bottom: 6px; }
+
+    .search-field input {
+      width: 100%;
+      min-height: 46px;
+      border: 1px solid #aeb9bf;
+      border-radius: 11px;
+      background: white;
+      color: var(--ink);
+      padding: 10px 13px;
+      font: inherit;
+    }
+
+    .filter-groups { display: grid; gap: 11px; }
+
+    .filter-set {
+      min-width: 0;
+      margin: 0;
+      border: 0;
+      padding: 0;
+    }
+
+    .filter-set legend { margin-bottom: 6px; }
+
+    .filter-buttons { display: flex; flex-wrap: wrap; gap: 7px; }
+
+    .filter-button,
+    .reset-button {
+      min-height: 40px;
+      border: 1px solid #aeb9bf;
+      border-radius: 999px;
+      background: white;
+      color: var(--ink);
+      padding: 7px 12px;
+      font: inherit;
+      font-size: 0.88rem;
+      font-weight: 750;
+      cursor: pointer;
+    }
+
+    .filter-button[aria-pressed="true"] {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: white;
+    }
+
+    .filter-button:hover,
+    .reset-button:hover { border-color: var(--accent); }
+
+    .filter-button:focus-visible,
+    .reset-button:focus-visible,
+    .search-field input:focus-visible {
+      outline: 3px solid #86bdd4;
+      outline-offset: 2px;
+    }
+
+    .filter-status-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 14px;
+      border-top: 1px solid var(--line);
+      padding-top: 13px;
+    }
+
+    .result-count { margin: 0; color: var(--muted); font-weight: 750; }
+
+    .no-results {
+      margin: -18px 0 44px;
+      border: 1px dashed #aeb9bf;
+      border-radius: 16px;
+      background: var(--panel);
+      padding: 28px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    section { margin: 34px 0 70px; }
+
+    .intro-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(300px, 0.78fr);
+      gap: 28px;
+      align-items: stretch;
+    }
+
+    .panel, .piece-card {
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .panel { padding: clamp(22px, 4vw, 36px); }
+
+    .prototype {
+      overflow: hidden;
+      min-height: 390px;
+      position: relative;
+    }
+
+    .prototype img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .prototype figcaption {
+      position: absolute;
+      inset: auto 14px 14px;
+      border-radius: 12px;
+      background: rgba(18, 26, 31, 0.86);
+      color: white;
+      padding: 10px 12px;
+      font-size: 0.84rem;
+    }
+
+    .legend {
+      display: grid;
+      gap: 13px;
+      margin-top: 22px;
+    }
+
+    .legend-item { display: flex; gap: 12px; align-items: center; }
+    .swatch { width: 26px; height: 26px; border-radius: 7px; flex: 0 0 auto; }
+    .swatch.platform { background: var(--platform-soft); border: 2px solid var(--platform); }
+    .swatch.wall { background: var(--wall); border: 4px solid var(--wall-edge); }
+    .swatch.open { background: var(--open); border-radius: 50%; }
+
+    .piece-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 24px;
+      margin-top: 26px;
+    }
+
+    .adapter-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 24px;
+      margin-top: 26px;
+    }
+
+    .wall-size-block { margin-top: 34px; }
+
+    .wall-variant-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .wall-card .piece-body { padding: 20px; }
+    .wall-card h3 { font-size: 1.22rem; }
+    .wall-card .piece-description { margin-bottom: 12px; }
+    .wall-card .download { margin: 0; font-weight: 750; }
+
+    .transition-plan {
+      display: block;
+      width: 100%;
+      max-width: 430px;
+      margin: 18px auto;
+    }
+
+    .transition-label { fill: var(--accent); font-size: 13px; font-weight: 900; text-anchor: middle; }
+
+    .piece-card { overflow: hidden; }
+
+    .render {
+      aspect-ratio: 4 / 3;
+      display: block;
+      width: 100%;
+      object-fit: contain;
+      background: #eef1ef;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .piece-body { padding: 24px; }
+    .piece-heading { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
+
+    .badge {
+      flex: 0 0 auto;
+      border-radius: 999px;
+      background: #e3f1ea;
+      color: #155d42;
+      padding: 5px 10px;
+      font-size: 0.78rem;
+      font-weight: 800;
+    }
+
+    .piece-description { color: var(--muted); margin: 10px 0 16px; }
+
+    .diagram-wrap {
+      display: grid;
+      grid-template-columns: 150px minmax(0, 1fr);
+      gap: 18px;
+      align-items: center;
+      border-top: 1px solid var(--line);
+      padding-top: 18px;
+    }
+
+    .diagram { width: 150px; height: 150px; display: block; }
+    .tile { fill: var(--platform-soft); stroke: var(--platform); stroke-width: 3; }
+    .wall-line { stroke: var(--wall-edge); stroke-width: 15; stroke-linecap: square; }
+    .side-label { fill: var(--muted); font-size: 13px; font-weight: 800; text-anchor: middle; }
+    .open-label { fill: var(--open); font-size: 13px; font-weight: 900; text-anchor: middle; }
+
+    dl { margin: 0; }
+    dt { color: var(--muted); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+    dd { margin: 2px 0 12px; font-weight: 650; }
+    code { overflow-wrap: anywhere; font: 0.87em ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    .piece-card.featured { grid-column: 1 / -1; }
+    .piece-card.featured .piece-layout { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr); }
+    .piece-card.featured .render { height: 100%; min-height: 420px; border: 0; border-right: 1px solid var(--line); }
+
+    .adapter-plan-wrap {
+      display: grid;
+      grid-template-columns: minmax(210px, 0.9fr) minmax(0, 1.1fr);
+      gap: 20px;
+      align-items: center;
+      border-top: 1px solid var(--line);
+      padding-top: 18px;
+    }
+
+    .adapter-plan { display: block; width: 100%; max-height: 310px; }
+    .pocket-mark { fill: var(--open); stroke: #135b40; stroke-width: 1.5; }
+    .module-outline { fill: none; stroke: var(--accent); stroke-width: 3; stroke-dasharray: 8 6; }
+    .plan-label { fill: var(--accent); font-size: 12px; font-weight: 900; text-anchor: middle; }
+
+    .compatibility-note {
+      margin-top: 26px;
+      border: 1px solid #e2c778;
+      border-left: 6px solid #b98600;
+      border-radius: 5px 16px 16px 5px;
+      background: #fff7dc;
+      padding: 19px 21px;
+    }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 13px 10px; text-align: left; vertical-align: top; }
+    th { color: var(--muted); font-size: 0.8rem; letter-spacing: 0.06em; text-transform: uppercase; }
+
+    .note {
+      border-left: 5px solid var(--accent);
+      background: #eaf2f5;
+      padding: 18px 20px;
+      border-radius: 4px 14px 14px 4px;
+    }
+
+    footer { padding: 0 0 48px; color: var(--muted); font-size: 0.88rem; }
+
+    @media (max-width: 820px) {
+      .intro-grid, .piece-grid, .adapter-grid, .piece-card.featured .piece-layout { grid-template-columns: 1fr; }
+      .catalog-controls { position: relative; top: auto; }
+      .filter-layout { grid-template-columns: 1fr; }
+      .wall-variant-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .piece-card.featured { grid-column: auto; }
+      .piece-card.featured .render { min-height: 0; border-right: 0; border-bottom: 1px solid var(--line); }
+      .prototype { min-height: 330px; }
+    }
+
+    @media (max-width: 500px) {
+      header, main, footer { width: min(100% - 24px, 1180px); }
+      header { padding-top: 34px; }
+      .diagram-wrap { grid-template-columns: 1fr; }
+      .adapter-plan-wrap { grid-template-columns: 1fr; }
+      .wall-variant-grid { grid-template-columns: 1fr; }
+      .diagram { margin-inline: auto; }
+      table, tbody, tr, td { display: block; width: 100%; }
+      thead { display: none; }
+      tr { border-bottom: 1px solid var(--line); padding: 11px 0; }
+      td { border: 0; padding: 3px 0; }
+      td:nth-child(2) { display: none; }
+      td:nth-child(3)::before { content: "Use: "; color: var(--muted); font-weight: 800; }
+    }
+
+    @media print {
+      body { background: white; font-size: 11pt; }
+      header, main, footer { width: 100%; }
+      section { break-inside: avoid; margin-block: 24px; }
+      .panel, .piece-card { box-shadow: none; }
+      .piece-card { break-inside: avoid; }
+      a { color: inherit; text-decoration: none; }
+      .catalog-controls, .no-results { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <p class="eyebrow">Printable 200 mm modular system</p>
+    <h1>Grid Maze Piece Catalog</h1>
+    <p class="lede">
+      Five maze pieces derived from the existing Rhino straight-piece geometry,
+      plus two core ramps, twelve new 200 × 300 challenge variants, two larger H2D
+      adapter platforms, ten H2D wall variants, and two 45° special pieces that
+      retain the X1C connector. Every wall comes from the user's Rhino wall geometry.
+      Standard wall-bearing pieces are 82 mm tall, the highest ramps reach 84 mm,
+      and fully open pieces are 10 mm platforms.
+    </p>
+    <div class="facts" aria-label="Key dimensions">
+      <span class="fact">200 × 200 mm footprint</span>
+      <span class="fact">10 mm platform</span>
+      <span class="fact">72 mm walls</span>
+      <span class="fact">82 mm with walls</span>
+      <span class="fact">10 mm open cross</span>
+      <span class="fact">14 ramp and hill challenges</span>
+      <span class="fact">200 × 300 + 300 × 300 H2D adapters</span>
+      <span class="fact">One centred connector per side</span>
+      <span class="fact">12 larger wall pieces</span>
+      <span class="fact">H2D single- or dual-nozzle envelope</span>
+    </div>
+  </header>
+
+  <main>
+    <aside class="catalog-controls" aria-labelledby="catalog-filter-title">
+      <p class="eyebrow" id="catalog-filter-title">Find a printable piece</p>
+      <div class="filter-layout">
+        <div class="search-field">
+          <label for="catalog-search">Search titles, details, dimensions, or filenames</label>
+          <input id="catalog-search" type="search" autocomplete="off" placeholder="Try “300 × 300”, “rounded”, or “dead-end”" aria-describedby="catalog-filter-help">
+        </div>
+        <div class="filter-groups">
+          <fieldset class="filter-set">
+            <legend>Printer / platform</legend>
+            <div class="filter-buttons">
+              <button class="filter-button" type="button" data-filter-group="platform" data-filter-value="all" aria-pressed="true">All platforms</button>
+              <button class="filter-button" type="button" data-filter-group="platform" data-filter-value="h2d" aria-pressed="false">H2D only</button>
+              <button class="filter-button" type="button" data-filter-group="platform" data-filter-value="x1c" aria-pressed="false">X1C / 200-only</button>
+            </div>
+          </fieldset>
+          <fieldset class="filter-set">
+            <legend>Piece type</legend>
+            <div class="filter-buttons">
+              <button class="filter-button" type="button" data-filter-group="category" data-filter-value="all" aria-pressed="true">All types</button>
+              <button class="filter-button" type="button" data-filter-group="category" data-filter-value="challenge" aria-pressed="false">Challenge ramps</button>
+              <button class="filter-button" type="button" data-filter-group="category" data-filter-value="platform" aria-pressed="false">Platforms / adapters</button>
+              <button class="filter-button" type="button" data-filter-group="category" data-filter-value="walls" aria-pressed="false">Walls / maze pieces</button>
+            </div>
+          </fieldset>
+        </div>
+      </div>
+      <div class="filter-status-row">
+        <p class="result-count" id="catalog-result-count" role="status" aria-live="polite" aria-atomic="true">Showing the full catalogue.</p>
+        <button class="reset-button" id="catalog-reset" type="button">Clear search and filters</button>
+      </div>
+      <span id="catalog-filter-help" hidden>Search and the two selected filters work together. Press Escape in the search box to clear the search.</span>
+    </aside>
+
+    <div class="no-results" id="catalog-no-results" role="status" hidden>
+      <strong>No printable pieces match those filters.</strong><br>
+      Try a different search, platform, or piece type—or clear the filters.
+    </div>
+
+    <section class="intro-grid" aria-labelledby="how-to-read">
+      <div class="panel">
+        <p class="eyebrow">How to read the catalog</p>
+        <h2 id="how-to-read">Open sides are entrances</h2>
+        <p>
+          North is shown at the top of each plan diagram. A dark edge is a tall
+          wall. A green side label is open, so a ball, robot, or player can travel
+          through that side. Rotate any printed piece to obtain the other directions.
+        </p>
+        <div class="legend" aria-label="Diagram legend">
+          <div class="legend-item"><span class="swatch platform"></span><span>Red-tinted square: common platform</span></div>
+          <div class="legend-item"><span class="swatch wall"></span><span>Dark bar: wall copied from the Rhino source</span></div>
+          <div class="legend-item"><span class="swatch open"></span><span>Green label: open connection</span></div>
+        </div>
+        <p class="note" style="margin-top: 24px">
+          The diagrams explain connectivity; the rendered images show the printable
+          geometry. The Rhino model—not the photograph—is the dimensional source.
+        </p>
+      </div>
+
+      <figure class="panel prototype">
+        <img src="../reference/photos/IMG_6221-preview.jpg" alt="Red platforms and white maze walls assembled into connected passages">
+        <figcaption>Existing physical prototype photographed in IMG_6221.</figcaption>
+      </figure>
+    </section>
+
+    <section aria-labelledby="pieces" data-filter-section>
+      <p class="eyebrow">Starter set</p>
+      <h2 id="pieces">Five pieces, every direction</h2>
+      <p>Only one orientation of each shape needs to be printed; rotate it during assembly or in the slicer.</p>
+
+      <div class="piece-grid">
+        <article class="piece-card featured" data-catalog-item data-platform="x1c" data-category="walls">
+          <div class="piece-layout">
+            <img class="render" src="images/maze-piece-straight.png" alt="Isometric render of the straight maze piece">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>Straight</h3><span class="badge">Source orientation</span></div>
+              <p class="piece-description">A direct passage through opposite sides. This is the reference piece already modeled in Rhino.</p>
+              <div class="diagram-wrap">
+                <svg class="diagram" viewBox="0 0 220 220" role="img" aria-label="Straight piece open north and south, walled east and west">
+                  <rect class="tile" x="25" y="25" width="170" height="170" rx="8"/>
+                  <line class="wall-line" x1="33" y1="33" x2="33" y2="187"/>
+                  <line class="wall-line" x1="187" y1="33" x2="187" y2="187"/>
+                  <text class="open-label" x="110" y="17">N OPEN</text>
+                  <text class="side-label" x="207" y="114">E</text>
+                  <text class="open-label" x="110" y="214">S OPEN</text>
+                  <text class="side-label" x="12" y="114">W</text>
+                </svg>
+                <dl>
+                  <dt>Open sides</dt><dd>North + South</dd>
+                  <dt>STL</dt><dd><a href="../output/variants/maze_piece_straight_v1.stl"><code>maze_piece_straight_v1.stl</code></a></dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="piece-card" data-catalog-item data-platform="x1c" data-category="walls">
+          <img class="render" src="images/maze-piece-corner.png" alt="Isometric render of the corner maze piece">
+          <div class="piece-body">
+            <div class="piece-heading"><h3>Corner</h3><span class="badge">90° turn</span></div>
+            <p class="piece-description">Turns the route through 90 degrees between two neighbouring sides.</p>
+            <div class="diagram-wrap">
+              <svg class="diagram" viewBox="0 0 220 220" role="img" aria-label="Corner piece open north and east, walled south and west">
+                <rect class="tile" x="25" y="25" width="170" height="170" rx="8"/>
+                <line class="wall-line" x1="33" y1="33" x2="33" y2="187"/>
+                <line class="wall-line" x1="33" y1="187" x2="187" y2="187"/>
+                <text class="open-label" x="110" y="17">N OPEN</text>
+                <text class="open-label" x="207" y="110" transform="rotate(90 207 110)">E OPEN</text>
+                <text class="side-label" x="110" y="214">S</text>
+                <text class="side-label" x="12" y="114">W</text>
+              </svg>
+              <dl><dt>Open sides</dt><dd>North + East</dd><dt>STL</dt><dd><a href="../output/variants/maze_piece_corner_v1.stl"><code>maze_piece_corner_v1.stl</code></a></dd></dl>
+            </div>
+          </div>
+        </article>
+
+        <article class="piece-card" data-catalog-item data-platform="x1c" data-category="walls">
+          <img class="render" src="images/maze-piece-t-junction.png" alt="Isometric render of the T-junction maze piece">
+          <div class="piece-body">
+            <div class="piece-heading"><h3>T-junction</h3><span class="badge">3 routes</span></div>
+            <p class="piece-description">Splits one route into two, with a single wall on the closed side.</p>
+            <div class="diagram-wrap">
+              <svg class="diagram" viewBox="0 0 220 220" role="img" aria-label="T-junction open north, east, and south, walled west">
+                <rect class="tile" x="25" y="25" width="170" height="170" rx="8"/>
+                <line class="wall-line" x1="33" y1="33" x2="33" y2="187"/>
+                <text class="open-label" x="110" y="17">N OPEN</text>
+                <text class="open-label" x="207" y="110" transform="rotate(90 207 110)">E OPEN</text>
+                <text class="open-label" x="110" y="214">S OPEN</text>
+                <text class="side-label" x="12" y="114">W</text>
+              </svg>
+              <dl><dt>Open sides</dt><dd>North + East + South</dd><dt>STL</dt><dd><a href="../output/variants/maze_piece_t_junction_v1.stl"><code>maze_piece_t_junction_v1.stl</code></a></dd></dl>
+            </div>
+          </div>
+        </article>
+
+        <article class="piece-card" data-catalog-item data-platform="x1c" data-category="walls">
+          <img class="render" src="images/maze-piece-cross-junction.png" alt="Isometric render of the cross-junction maze piece">
+          <div class="piece-body">
+            <div class="piece-heading"><h3>Cross-junction</h3><span class="badge">4 routes</span></div>
+            <p class="piece-description">An open platform joining all four neighbouring tiles.</p>
+            <div class="diagram-wrap">
+              <svg class="diagram" viewBox="0 0 220 220" role="img" aria-label="Cross-junction open on all four sides">
+                <rect class="tile" x="25" y="25" width="170" height="170" rx="8"/>
+                <text class="open-label" x="110" y="17">N OPEN</text>
+                <text class="open-label" x="207" y="110" transform="rotate(90 207 110)">E OPEN</text>
+                <text class="open-label" x="110" y="214">S OPEN</text>
+                <text class="open-label" x="12" y="110" transform="rotate(-90 12 110)">W OPEN</text>
+              </svg>
+              <dl><dt>Open sides</dt><dd>North + East + South + West</dd><dt>STL</dt><dd><a href="../output/variants/maze_piece_cross_junction_v1.stl"><code>maze_piece_cross_junction_v1.stl</code></a></dd></dl>
+            </div>
+          </div>
+        </article>
+
+        <article class="piece-card" data-catalog-item data-platform="x1c" data-category="walls">
+          <img class="render" src="images/maze-piece-end.png" alt="Isometric render of the end or dead-end maze piece">
+          <div class="piece-body">
+            <div class="piece-heading"><h3>End / dead-end</h3><span class="badge">1 route</span></div>
+            <p class="piece-description">Finishes a route with three walls while retaining one connection to the maze.</p>
+            <div class="diagram-wrap">
+              <svg class="diagram" viewBox="0 0 220 220" role="img" aria-label="End piece open north, walled east, south, and west">
+                <rect class="tile" x="25" y="25" width="170" height="170" rx="8"/>
+                <line class="wall-line" x1="33" y1="33" x2="33" y2="187"/>
+                <line class="wall-line" x1="187" y1="33" x2="187" y2="187"/>
+                <line class="wall-line" x1="33" y1="187" x2="187" y2="187"/>
+                <text class="open-label" x="110" y="17">N OPEN</text>
+                <text class="side-label" x="207" y="114">E</text>
+                <text class="side-label" x="110" y="214">S</text>
+                <text class="side-label" x="12" y="114">W</text>
+              </svg>
+              <dl><dt>Open sides</dt><dd>North only</dd><dt>STL</dt><dd><a href="../output/variants/maze_piece_end_v1.stl"><code>maze_piece_end_v1.stl</code></a></dd></dl>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section aria-labelledby="ramp-piece" data-filter-section>
+      <p class="eyebrow">Vertical maze route</p>
+      <h2 id="ramp-piece">30° challenge ramps</h2>
+      <article class="piece-card featured" data-catalog-item data-platform="x1c" data-category="challenge">
+        <div class="piece-layout">
+          <img class="render" src="images/maze-piece-x1c-200x200-30deg-ramp.png" alt="Isometric render of the 200 millimetre X1C ramp tile rising at 30 degrees toward its north edge">
+          <div class="piece-body">
+            <div class="piece-heading"><h3>North-high straight ramp</h3><span class="badge">30° rise</span></div>
+            <p class="piece-description">
+              A flat south approach leads into a straight 30° ramp between the two
+              authored side walls. The north edge reaches 84 mm—exactly 2 mm above
+              the 82 mm wall top. Rotate the tile to choose another high side. Its
+              north pocket remains mechanically compatible, but the raised surface
+              is intentionally not level with a normal 10 mm tile.
+            </p>
+            <svg class="transition-plan" viewBox="0 0 380 235" role="img" aria-label="Side elevation showing a 71.83 millimetre flat approach followed by a 128.17 millimetre run rising 74 millimetres at 30 degrees">
+              <rect class="tile" x="28" y="190" width="324" height="16" rx="3"/>
+              <polygon class="tile" points="144,190 352,70 352,190"/>
+              <line x1="144" y1="190" x2="352" y2="70" stroke="var(--wall-edge)" stroke-width="4"/>
+              <line x1="28" y1="74" x2="352" y2="74" stroke="var(--accent)" stroke-width="2" stroke-dasharray="7 6"/>
+              <path d="M174 190 A30 30 0 0 1 170 175" fill="none" stroke="var(--open)" stroke-width="3"/>
+              <text class="transition-label" x="182" y="170">30°</text>
+              <text class="transition-label" x="86" y="226">71.83 MM APPROACH</text>
+              <text class="transition-label" x="250" y="226">128.17 MM RUN</text>
+              <text class="transition-label" x="88" y="67">WALL TOP · 82 MM</text>
+              <text class="transition-label" x="315" y="54">RAMP · 84 MM</text>
+            </svg>
+            <dl>
+              <dt>Footprint</dt><dd>200 × 200 mm X1C tile</dd>
+              <dt>Ramp</dt><dd>74 mm rise · 128.172 mm run · 148 mm slope</dd>
+              <dt>Connectors</dt><dd>One centred pocket on every side</dd>
+              <dt>STL</dt><dd><a href="../output/ramp/maze_piece_x1c_200x200_30deg_ramp_v1.stl">Download the 30° ramp STL</a></dd>
+              <dt>Rhino</dt><dd><a href="../output/ramp/maze_piece_x1c_30deg_ramp_v1.3dm">Open the editable ramp model</a></dd>
+            </dl>
+          </div>
+        </div>
+      </article>
+
+      <article class="piece-card featured" style="margin-top: 24px" data-catalog-item data-platform="h2d" data-category="challenge">
+        <div class="piece-layout">
+          <img class="render" src="images/maze-piece-h2d-200x300-30deg-up-down-ramp.png" alt="Isometric render of the 200 by 300 millimetre challenge tile with a 30-degree climb and matching descent">
+          <div class="piece-body">
+            <div class="piece-heading"><h3>Up-and-down ridge challenge</h3><span class="badge">30° + 30°</span></div>
+            <p class="piece-description">
+              Floor-level approaches at both ends lead over a centred ridge. The
+              tile climbs at exactly 30°, reaches 84 mm—2 mm above the wall top—then
+              descends at the same angle. The 200 × 300 platform retains one centred
+              X1C connector pocket on every side.
+            </p>
+            <svg class="transition-plan" viewBox="0 0 500 240" role="img" aria-label="Side elevation showing equal 21.83 millimetre approaches, two 128.17 millimetre 30-degree slopes, and a centred 84 millimetre peak">
+              <rect class="tile" x="28" y="190" width="444" height="16" rx="3"/>
+              <polygon class="tile" points="60,190 250,80 440,190"/>
+              <polyline points="60,190 250,80 440,190" fill="none" stroke="var(--wall-edge)" stroke-width="4" stroke-linejoin="miter"/>
+              <line x1="28" y1="83" x2="472" y2="83" stroke="var(--accent)" stroke-width="2" stroke-dasharray="7 6"/>
+              <text class="transition-label" x="108" y="172">30° UP</text>
+              <text class="transition-label" x="392" y="172">30° DOWN</text>
+              <text class="transition-label" x="250" y="62">CENTRED PEAK · 84 MM</text>
+              <text class="transition-label" x="84" y="226">21.83 MM</text>
+              <text class="transition-label" x="178" y="226">128.17 MM</text>
+              <text class="transition-label" x="322" y="226">128.17 MM</text>
+              <text class="transition-label" x="416" y="226">21.83 MM</text>
+            </svg>
+            <dl>
+              <dt>Footprint</dt><dd>200 × 300 mm H2D tile</dd>
+              <dt>Profile</dt><dd>30° up + 30° down · centred Z84 ridge</dd>
+              <dt>Each slope</dt><dd>74 mm rise · 128.172 mm run · 148 mm length</dd>
+              <dt>Connectors</dt><dd>One centred X1C pocket on every side</dd>
+              <dt>STL</dt><dd><a href="../output/challenge-ramp/maze_piece_h2d_200x300_30deg_up_down_ramp_v1.stl">Download the up-and-down ramp STL</a></dd>
+              <dt>Rhino</dt><dd><a href="../output/challenge-ramp/maze_piece_h2d_200x300_30deg_up_down_ramp_v1.3dm">Open the editable challenge model</a></dd>
+            </dl>
+          </div>
+        </div>
+      </article>
+
+      <div class="wall-size-block" data-filter-subgroup>
+        <p class="eyebrow">Twelve-piece expansion</p>
+        <h3>200 × 300 challenge collection</h3>
+        <p>
+          Every piece keeps the reviewed H2D footprint and one centred X1C-compatible
+          connector pocket on each edge. Rotate a piece to change its travel direction.
+        </p>
+        <img class="render" style="margin-top: 20px; border: 1px solid var(--line); border-radius: 16px" src="images/challenge-ramp-variants-overview.png" alt="Labelled overview of all twelve 200 by 300 millimetre challenge ramp variants">
+
+        <div class="wall-variant-grid">
+          <article class="piece-card wall-card" data-catalog-item data-platform="h2d" data-category="challenge">
+            <img class="render" src="images/maze-piece-h2d-200x300-flat-top-30mm.png" alt="Isometric render of a 200 by 300 millimetre hill with a 30 millimetre flat top">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>Flat-top hill</h3><span class="badge">Z84</span></div>
+              <p class="piece-description">Two 30° slopes meet a centred 30 mm landing, with a short level entry at both ends.</p>
+              <dl><dt>Profile</dt><dd>30 mm plateau · 6.83 mm approaches</dd><dt>STL</dt><dd><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_flat_top_30mm_v1.stl">Download flat-top hill</a></dd></dl>
+            </div>
+          </article>
+
+          <article class="piece-card wall-card" data-catalog-item data-platform="h2d" data-category="challenge">
+            <img class="render" src="images/maze-piece-h2d-200x300-double-hump-30mm-rise.png" alt="Isometric render of a 200 by 300 millimetre double-hump challenge piece">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>Double hump</h3><span class="badge">2 peaks</span></div>
+              <p class="piece-description">Two separate 30° hills rise 30 mm above the floor with a 20 mm valley between them.</p>
+              <dl><dt>Profile</dt><dd>Two Z40 peaks · 36.08 mm approaches</dd><dt>STL</dt><dd><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_double_hump_30mm_rise_v1.stl">Download double hump</a></dd></dl>
+            </div>
+          </article>
+
+          <article class="piece-card wall-card" data-catalog-item data-platform="h2d" data-category="challenge">
+            <img class="render" src="images/maze-piece-h2d-200x300-traction-ribs.png" alt="Isometric render of the full-height ridge with transverse traction ribs">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>Traction ridge</h3><span class="badge">12 ribs</span></div>
+              <p class="piece-description">The full Z84 ridge gains six shallow transverse traction ribs on each 30° face.</p>
+              <dl><dt>Ribs</dt><dd>3 mm travel width · 1.5 mm high</dd><dt>STL</dt><dd><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_traction_ribs_v1.stl">Download traction ridge</a></dd></dl>
+            </div>
+          </article>
+
+          <article class="piece-card wall-card" data-catalog-item data-platform="h2d" data-category="challenge">
+            <img class="render" src="images/maze-piece-h2d-200x300-low-hill-20mm-rise.png" alt="Isometric render of a low hill rising 20 millimetres above the floor">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>Low hill</h3><span class="badge">20 mm rise</span></div>
+              <p class="piece-description">A gentle-sized obstacle with symmetric 30° faces and a centred Z30 ridge.</p>
+              <dl><dt>Peak</dt><dd>Z30 · 20 mm above floor</dd><dt>STL</dt><dd><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_low_hill_20mm_rise_v1.stl">Download 20 mm hill</a></dd></dl>
+            </div>
+          </article>
+
+          <article class="piece-card wall-card" data-catalog-item data-platform="h2d" data-category="challenge">
+            <img class="render" src="images/maze-piece-h2d-200x300-low-hill-40mm-rise.png" alt="Isometric render of a medium hill rising 40 millimetres above the floor">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>Medium hill</h3><span class="badge">40 mm rise</span></div>
+              <p class="piece-description">The middle difficulty hill keeps 30° faces and reaches a centred Z50 ridge.</p>
+              <dl><dt>Peak</dt><dd>Z50 · 40 mm above floor</dd><dt>STL</dt><dd><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_low_hill_40mm_rise_v1.stl">Download 40 mm hill</a></dd></dl>
+            </div>
+          </article>
+
+          <article class="piece-card wall-card" data-catalog-item data-platform="h2d" data-category="challenge">
+            <img class="render" src="images/maze-piece-h2d-200x300-low-hill-60mm-rise.png" alt="Isometric render of a tall hill rising 60 millimetres above the floor">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>Tall hill</h3><span class="badge">60 mm rise</span></div>
+              <p class="piece-description">A taller intermediate obstacle with symmetric 30° faces and a centred Z70 ridge.</p>
+              <dl><dt>Peak</dt><dd>Z70 · 60 mm above floor</dd><dt>STL</dt><dd><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_low_hill_60mm_rise_v1.stl">Download 60 mm hill</a></dd></dl>
+            </div>
+          </article>
+
+          <article class="piece-card wall-card" data-catalog-item data-platform="h2d" data-category="challenge">
+            <img class="render" src="images/maze-piece-h2d-200x300-offset-ridge.png" alt="Isometric render of a challenge hill with its ridge offset toward one end">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>Offset ridge</h3><span class="badge">Asymmetric</span></div>
+              <p class="piece-description">A Y100 peak makes one short 42.77° face and one long 22.35° face while preserving level entries.</p>
+              <dl><dt>Peak</dt><dd>Y100 · Z84</dd><dt>STL</dt><dd><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_offset_ridge_v1.stl">Download offset ridge</a></dd></dl>
+            </div>
+          </article>
+
+          <article class="piece-card wall-card" data-catalog-item data-platform="h2d" data-category="challenge">
+            <img class="render" src="images/maze-piece-h2d-200x300-rounded-crest-r15.png" alt="Isometric render of a full-height hill with a rounded central crest">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>Rounded crest</h3><span class="badge">R15</span></div>
+              <p class="piece-description">A tangent 15 mm circular crest smoothly joins the two 30° faces without a flat plateau.</p>
+              <dl><dt>Top</dt><dd>Centred Y150 · Z84</dd><dt>STL</dt><dd><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_rounded_crest_r15_v1.stl">Download rounded crest</a></dd></dl>
+            </div>
+          </article>
+
+          <article class="piece-card wall-card" data-catalog-item data-platform="h2d" data-category="challenge">
+            <img class="render" src="images/maze-piece-h2d-200x300-central-platform-80mm.png" alt="Isometric render of a hill with a large central stopping platform">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>Central platform</h3><span class="badge">80 mm top</span></div>
+              <p class="piece-description">Two 30° approaches lead to a broad Z60 stopping or staging area in the centre.</p>
+              <dl><dt>Platform</dt><dd>Y110–190 · Z60</dd><dt>STL</dt><dd><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_central_platform_80mm_v1.stl">Download central platform</a></dd></dl>
+            </div>
+          </article>
+
+          <article class="piece-card wall-card" data-catalog-item data-platform="h2d" data-category="challenge">
+            <img class="render" src="images/maze-piece-h2d-200x300-single-wall-ridge.png" alt="Isometric render of the full-height ridge with only one authored side wall">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>Single-wall ridge</h3><span class="badge">West wall</span></div>
+              <p class="piece-description">The Z84 ridge keeps its west guide wall while opening the east edge of the challenge.</p>
+              <dl><dt>Walls</dt><dd>West retained · east open</dd><dt>STL</dt><dd><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_single_wall_ridge_v1.stl">Download single-wall ridge</a></dd></dl>
+            </div>
+          </article>
+
+          <article class="piece-card wall-card" data-catalog-item data-platform="h2d" data-category="challenge">
+            <img class="render" src="images/maze-piece-h2d-200x300-open-sides-ridge.png" alt="Isometric render of the full-height ridge with both sides open">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>Open-sides ridge</h3><span class="badge">No walls</span></div>
+              <p class="piece-description">Both authored walls are omitted, leaving the full Z84 ridge exposed on either side.</p>
+              <dl><dt>Walls</dt><dd>West open · east open</dd><dt>STL</dt><dd><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_open_sides_ridge_v1.stl">Download open-sides ridge</a></dd></dl>
+            </div>
+          </article>
+
+          <article class="piece-card wall-card" data-catalog-item data-platform="h2d" data-category="challenge">
+            <img class="render" src="images/maze-piece-h2d-200x300-ramp-up-steps-down.png" alt="Isometric render of a directional challenge with a smooth ramp up and ten steps down">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>Ramp and steps</h3><span class="badge">Directional</span></div>
+              <p class="piece-description">Travel north for a smooth 30° climb followed by ten equal steps descending to floor level.</p>
+              <dl><dt>Steps</dt><dd>10 × 7.4 mm drops</dd><dt>STL</dt><dd><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_ramp_up_steps_down_v1.stl">Download ramp-and-steps piece</a></dd></dl>
+            </div>
+          </article>
+        </div>
+
+        <p style="margin-top: 20px">
+          <a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_challenge_variants_v1.3dm">Open the combined editable challenge-variant Rhino file</a>
+        </p>
+      </div>
+    </section>
+
+    <section aria-labelledby="h2d-adapters" data-filter-section>
+      <p class="eyebrow">H2D-compatible platforms</p>
+      <h2 id="h2d-adapters">More area, same X1C connector</h2>
+      <p>
+        These platforms keep the original dovetail, bridge, pocket depth, clearance,
+        and 200 mm attachment alignment. Nothing on an existing X1C platform needs
+        to be resized. Each platform has one connector bay centred on every side.
+        The dashed blue square marks the centred 200 mm alignment span used by an
+        attached X1C platform; the attached platform itself sits outside the edge.
+      </p>
+
+      <div class="adapter-grid">
+        <article class="piece-card" data-catalog-item data-platform="h2d" data-category="platform">
+          <img class="render" src="images/h2d-platform-200x300.png" alt="Isometric render of the 200 by 300 millimetre H2D adapter platform">
+          <div class="piece-body">
+            <div class="piece-heading"><h3>200 × 300 long adapter</h3><span class="badge">Dual-nozzle fit</span></div>
+            <p class="piece-description">
+              One standard connector is centred on each side. An X1C platform
+              attached to either 300 mm edge sits centrally with 50 mm shoulders.
+            </p>
+            <div class="adapter-plan-wrap">
+              <svg class="adapter-plan" viewBox="0 0 300 390" role="img" aria-label="200 by 300 platform with one centred connector bay on each side">
+                <rect class="tile" x="50" y="40" width="200" height="300" rx="7"/>
+                <rect class="module-outline" x="50" y="90" width="200" height="200" rx="4"/>
+                <rect class="pocket-mark" x="129" y="35" width="42" height="10" rx="3"/>
+                <rect class="pocket-mark" x="129" y="335" width="42" height="10" rx="3"/>
+                <rect class="pocket-mark" x="45" y="169" width="10" height="42" rx="3"/>
+                <rect class="pocket-mark" x="245" y="169" width="10" height="42" rx="3"/>
+                <text class="plan-label" x="150" y="370">DASHED: 200 MM ALIGNMENT SPAN</text>
+              </svg>
+              <dl>
+                <dt>Footprint</dt><dd>200 × 300 × 10 mm</dd>
+                <dt>Every edge</dt><dd>One centred X1C bay</dd>
+                <dt>300 mm edges</dt><dd>Connector centre at 150 mm</dd>
+                <dt>STL</dt><dd><a href="../output/h2d-platforms/maze_platform_h2d_200x300_v1.stl">Download the 200 × 300 STL</a></dd>
+              </dl>
+            </div>
+          </div>
+        </article>
+
+        <article class="piece-card" data-catalog-item data-platform="h2d" data-category="platform">
+          <img class="render" src="images/h2d-platform-300x300.png" alt="Isometric render of the 300 by 300 millimetre H2D adapter platform">
+          <div class="piece-body">
+            <div class="piece-heading"><h3>300 × 300 square adapter</h3><span class="badge">Maximum square</span></div>
+            <p class="piece-description">
+              One standard connector sits at the centre of every edge, so each
+              attached X1C platform is centred. Use the H2D single-nozzle envelope.
+            </p>
+            <div class="adapter-plan-wrap">
+              <svg class="adapter-plan" viewBox="0 0 390 390" role="img" aria-label="300 millimetre square platform with one centred connector bay on every side">
+                <rect class="tile" x="45" y="40" width="300" height="300" rx="7"/>
+                <rect class="module-outline" x="95" y="90" width="200" height="200" rx="4"/>
+                <rect class="pocket-mark" x="174" y="35" width="42" height="10" rx="3"/>
+                <rect class="pocket-mark" x="174" y="335" width="42" height="10" rx="3"/>
+                <rect class="pocket-mark" x="40" y="169" width="10" height="42" rx="3"/>
+                <rect class="pocket-mark" x="340" y="169" width="10" height="42" rx="3"/>
+                <text class="plan-label" x="195" y="370">DASHED: 200 MM ALIGNMENT SPAN</text>
+              </svg>
+              <dl>
+                <dt>Footprint</dt><dd>300 × 300 × 10 mm</dd>
+                <dt>Every edge</dt><dd>One bay centred at 150 mm</dd>
+                <dt>Recommended mode</dt><dd>H2D single nozzle</dd>
+                <dt>STL</dt><dd><a href="../output/h2d-platforms/maze_platform_h2d_300x300_v1.stl">Download the 300 × 300 STL</a></dd>
+              </dl>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <div class="compatibility-note">
+        <strong>Centred alignment:</strong> an X1C platform attached to a 300 mm edge
+        occupies the middle 200 mm, leaving 50 mm at both ends. This keeps a single,
+        visually balanced connection on every side while preserving the exact X1C
+        connector geometry.
+      </div>
+      <p style="margin-top: 18px">
+        <a href="../output/h2d-platforms/maze_platform_h2d_compatible_v1.3dm">Open the combined editable H2D platform Rhino file</a>
+      </p>
+    </section>
+
+    <section aria-labelledby="h2d-wall-variants" data-filter-section>
+      <p class="eyebrow">Rhino-derived wall set</p>
+      <h2 id="h2d-wall-variants">The five maze layouts, now in both H2D sizes</h2>
+      <p>
+        These pieces reuse the wall height, thickness, transitions, and edge profile
+        from the working Rhino model. For a 300 mm wall, the two designed end regions
+        remain unchanged and only the uniform middle is extended by 100 mm. The wall
+        profile is never enlarged or stretched. The four-way hub is the deliberate
+        exception at the wall foot: it uses only the source wall's clean 1.2 mm
+        vertical panel, without the triangular sloped reinforcement corners.
+      </p>
+
+      <div class="compatibility-note">
+        <strong>Shared connection rule:</strong> every rectangular piece below retains
+        one centred X1C connector pocket on each side, including sides that carry a
+        wall. Open-side labels describe maze travel. The widening transition has
+        connectors only at its two open ends; the four-way 45° hub has one centred
+        connector and a 200 mm opening on every side.
+      </div>
+
+      <div class="wall-size-block" data-filter-subgroup>
+        <h3>200 × 300 mm wall pieces</h3>
+        <div class="wall-variant-grid">
+          <article class="piece-card wall-card" data-catalog-item data-platform="h2d" data-category="walls">
+            <img class="render" src="images/h2d-wall-200x300-straight.png" alt="Isometric render of the 200 by 300 straight wall maze piece">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>Straight</h3><span class="badge">N + S open</span></div>
+              <p class="piece-description">Two 300 mm side walls create a passage between the short ends.</p>
+              <p class="download"><a href="../output/h2d-wall-variants/maze_piece_h2d_200x300_straight_v1.stl">Download STL</a></p>
+            </div>
+          </article>
+          <article class="piece-card wall-card" data-catalog-item data-platform="h2d" data-category="walls">
+            <img class="render" src="images/h2d-wall-200x300-corner.png" alt="Isometric render of the 200 by 300 corner wall maze piece">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>Corner</h3><span class="badge">N + E open</span></div>
+              <p class="piece-description">Walls on the south and west sides turn the route through 90 degrees.</p>
+              <p class="download"><a href="../output/h2d-wall-variants/maze_piece_h2d_200x300_corner_v1.stl">Download STL</a></p>
+            </div>
+          </article>
+          <article class="piece-card wall-card" data-catalog-item data-platform="h2d" data-category="walls">
+            <img class="render" src="images/h2d-wall-200x300-t-junction.png" alt="Isometric render of the 200 by 300 T-junction wall maze piece">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>T-junction</h3><span class="badge">N + E + S</span></div>
+              <p class="piece-description">One west wall leaves three open sides for a split route.</p>
+              <p class="download"><a href="../output/h2d-wall-variants/maze_piece_h2d_200x300_t_junction_v1.stl">Download STL</a></p>
+            </div>
+          </article>
+          <article class="piece-card wall-card" data-catalog-item data-platform="h2d" data-category="walls">
+            <img class="render" src="images/h2d-wall-200x300-cross-junction.png" alt="Isometric render of the fully open 200 by 300 cross-junction maze piece">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>Cross-junction</h3><span class="badge">All sides open</span></div>
+              <p class="piece-description">The fully open platform completes the five-layout set.</p>
+              <p class="download"><a href="../output/h2d-wall-variants/maze_piece_h2d_200x300_cross_junction_v1.stl">Download STL</a></p>
+            </div>
+          </article>
+          <article class="piece-card wall-card" data-catalog-item data-platform="h2d" data-category="walls">
+            <img class="render" src="images/h2d-wall-200x300-end.png" alt="Isometric render of the 200 by 300 end or dead-end wall maze piece">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>End / dead-end</h3><span class="badge">N open</span></div>
+              <p class="piece-description">Three perimeter walls leave one entrance and a closed destination.</p>
+              <p class="download"><a href="../output/h2d-wall-variants/maze_piece_h2d_200x300_end_v1.stl">Download STL</a></p>
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <div class="wall-size-block" data-filter-subgroup>
+        <h3>300 × 300 mm wall pieces</h3>
+        <div class="wall-variant-grid">
+          <article class="piece-card wall-card" data-catalog-item data-platform="h2d" data-category="walls">
+            <img class="render" src="images/h2d-wall-300x300-straight.png" alt="Isometric render of the 300 millimetre square straight wall maze piece">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>Straight</h3><span class="badge">N + S open</span></div>
+              <p class="piece-description">Two opposing 300 mm walls form a wide straight passage.</p>
+              <p class="download"><a href="../output/h2d-wall-variants/maze_piece_h2d_300x300_straight_v1.stl">Download STL</a></p>
+            </div>
+          </article>
+          <article class="piece-card wall-card" data-catalog-item data-platform="h2d" data-category="walls">
+            <img class="render" src="images/h2d-wall-300x300-corner.png" alt="Isometric render of the 300 millimetre square corner wall maze piece">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>Corner</h3><span class="badge">N + E open</span></div>
+              <p class="piece-description">South and west walls make a 90-degree turn across the larger square.</p>
+              <p class="download"><a href="../output/h2d-wall-variants/maze_piece_h2d_300x300_corner_v1.stl">Download STL</a></p>
+            </div>
+          </article>
+          <article class="piece-card wall-card" data-catalog-item data-platform="h2d" data-category="walls">
+            <img class="render" src="images/h2d-wall-300x300-t-junction.png" alt="Isometric render of the 300 millimetre square T-junction wall maze piece">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>T-junction</h3><span class="badge">N + E + S</span></div>
+              <p class="piece-description">One west wall leaves three large open approaches.</p>
+              <p class="download"><a href="../output/h2d-wall-variants/maze_piece_h2d_300x300_t_junction_v1.stl">Download STL</a></p>
+            </div>
+          </article>
+          <article class="piece-card wall-card" data-catalog-item data-platform="h2d" data-category="walls">
+            <img class="render" src="images/h2d-wall-300x300-cross-junction.png" alt="Isometric render of the fully open 300 millimetre square cross-junction maze piece">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>Cross-junction</h3><span class="badge">All sides open</span></div>
+              <p class="piece-description">The open square joins routes from all four directions.</p>
+              <p class="download"><a href="../output/h2d-wall-variants/maze_piece_h2d_300x300_cross_junction_v1.stl">Download STL</a></p>
+            </div>
+          </article>
+          <article class="piece-card wall-card" data-catalog-item data-platform="h2d" data-category="walls">
+            <img class="render" src="images/h2d-wall-300x300-end.png" alt="Isometric render of the 300 millimetre square end or dead-end wall maze piece">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>End / dead-end</h3><span class="badge">N open</span></div>
+              <p class="piece-description">Three walls close the square while retaining one entrance.</p>
+              <p class="download"><a href="../output/h2d-wall-variants/maze_piece_h2d_300x300_end_v1.stl">Download STL</a></p>
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <div class="wall-size-block" data-filter-subgroup>
+        <h3>45° X1C-to-H2D transition</h3>
+        <article class="piece-card featured" data-catalog-item data-platform="h2d" data-category="platform walls">
+          <div class="piece-layout">
+            <img class="render" src="images/h2d-wall-45deg-transition.png" alt="Isometric render of the wall-bearing 45-degree X1C-to-H2D transition piece">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>Centred widening transition</h3><span class="badge">N + S open</span></div>
+              <p class="piece-description">
+                A 200 mm X1C edge widens to a centred 300 mm H2D edge. The two
+                shoulders move outward 50 mm over a 50 mm run, making exact 45°
+                wall segments. A continuous sharp-miter sweep keeps the Rhino wall
+                profile clean through both bends. One centred connector sits at
+                each open end.
+              </p>
+              <svg class="transition-plan" viewBox="0 0 360 270" role="img" aria-label="Top plan of a transition with a 200 millimetre south edge, 300 millimetre north edge, and two 45-degree shoulders">
+                <polygon class="tile" points="30,30 330,30 330,105 280,155 280,230 80,230 80,155 30,105"/>
+                <polyline class="wall-line" fill="none" points="30,30 30,105 80,155 80,230"/>
+                <polyline class="wall-line" fill="none" points="330,30 330,105 280,155 280,230"/>
+                <rect class="pocket-mark" x="159" y="25" width="42" height="10" rx="3"/>
+                <rect class="pocket-mark" x="159" y="225" width="42" height="10" rx="3"/>
+                <text class="transition-label" x="180" y="18">H2D · 300 MM</text>
+                <text class="transition-label" x="180" y="257">X1C · 200 MM</text>
+                <text class="transition-label" x="62" y="139">45°</text>
+                <text class="transition-label" x="298" y="139">45°</text>
+              </svg>
+              <dl>
+                <dt>Envelope</dt><dd>300 × 200 × 82 mm</dd>
+                <dt>Connectors</dt><dd>One centred bay at each open end</dd>
+                <dt>Walls</dt><dd>75 mm straight + 50 mm at 45° + 75 mm straight</dd>
+                <dt>STL</dt><dd><a href="../output/h2d-wall-variants/maze_piece_h2d_45deg_transition_v1.stl">Download the 45° transition STL</a></dd>
+              </dl>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <div class="wall-size-block" data-filter-subgroup>
+        <h3>Four-way 45° X1C hub</h3>
+        <article class="piece-card featured" data-catalog-item data-platform="h2d" data-category="walls">
+          <div class="piece-layout">
+            <img class="render" src="images/h2d-wall-300x300-45deg-four-way-clean.png" alt="Isometric render of the 300 millimetre four-way hub with four clean 45-degree diagonal wall panels and no triangular foot corners">
+            <div class="piece-body">
+              <div class="piece-heading"><h3>Four centred X1C approaches</h3><span class="badge">N + E + S + W open</span></div>
+              <p class="piece-description">
+                Four centred 200 mm openings let X1C pieces connect from every
+                direction. Four clean, source-derived vertical wall panels run at
+                exactly 45° while leaving a broad central junction. The triangular
+                sloped wall-foot corners are removed from this piece, and each side
+                retains one centred connector.
+              </p>
+              <svg class="transition-plan" viewBox="0 0 360 360" role="img" aria-label="Top plan of a 300 millimetre square four-way hub with centred 200 millimetre openings and four clean 45-degree diagonal walls">
+                <rect class="tile" x="30" y="30" width="300" height="300" rx="7"/>
+                <line class="wall-line" x1="80" y1="30" x2="30" y2="80"/>
+                <line class="wall-line" x1="280" y1="30" x2="330" y2="80"/>
+                <line class="wall-line" x1="330" y1="280" x2="280" y2="330"/>
+                <line class="wall-line" x1="80" y1="330" x2="30" y2="280"/>
+                <rect class="pocket-mark" x="159" y="25" width="42" height="10" rx="3"/>
+                <rect class="pocket-mark" x="325" y="159" width="10" height="42" rx="3"/>
+                <rect class="pocket-mark" x="159" y="325" width="42" height="10" rx="3"/>
+                <rect class="pocket-mark" x="25" y="159" width="10" height="42" rx="3"/>
+                <text class="transition-label" x="180" y="20">200 MM OPEN</text>
+                <text class="transition-label" x="180" y="352">200 MM OPEN</text>
+                <text class="transition-label" x="0" y="0" transform="translate(14 180) rotate(-90)">200 MM OPEN</text>
+                <text class="transition-label" x="0" y="0" transform="translate(346 180) rotate(90)">200 MM OPEN</text>
+                <text class="transition-label" x="63" y="66">45°</text>
+                <text class="transition-label" x="297" y="66">45°</text>
+                <text class="transition-label" x="63" y="304">45°</text>
+                <text class="transition-label" x="297" y="304">45°</text>
+              </svg>
+              <dl>
+                <dt>Envelope</dt><dd>300 × 300 × 82 mm</dd>
+                <dt>Connectors</dt><dd>One centred bay on every side</dd>
+                <dt>Openings</dt><dd>Four centred 200 mm X1C interfaces</dd>
+                <dt>Walls</dt><dd>Four exact 45° vertical panels; no triangular foot corners</dd>
+                <dt>STL</dt><dd><a href="../output/h2d-wall-variants/maze_piece_h2d_300x300_45deg_four_way_v1.stl">Download the four-way 45° hub STL</a></dd>
+              </dl>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <p style="margin-top: 20px">
+        <a href="../output/h2d-wall-variants/maze_piece_h2d_wall_variants_v1.3dm">Open the combined editable H2D wall-variant Rhino file</a>
+      </p>
+    </section>
+
+    <section class="panel" aria-labelledby="files" data-filter-section>
+      <p class="eyebrow">Printable files</p>
+      <h2 id="files">What each file contains</h2>
+      <table>
+        <thead><tr><th>File</th><th>Connections</th><th>Use</th></tr></thead>
+        <tbody>
+          <tr data-catalog-item data-platform="x1c" data-category="walls"><td><a href="../output/variants/maze_piece_straight_v1.stl"><code>maze_piece_straight_v1.stl</code></a></td><td>N + S</td><td>Pass straight through</td></tr>
+          <tr data-catalog-item data-platform="x1c" data-category="walls"><td><a href="../output/variants/maze_piece_corner_v1.stl"><code>maze_piece_corner_v1.stl</code></a></td><td>N + E</td><td>Turn 90 degrees</td></tr>
+          <tr data-catalog-item data-platform="x1c" data-category="walls"><td><a href="../output/variants/maze_piece_t_junction_v1.stl"><code>maze_piece_t_junction_v1.stl</code></a></td><td>N + E + S</td><td>Split into three routes</td></tr>
+          <tr data-catalog-item data-platform="x1c" data-category="walls"><td><a href="../output/variants/maze_piece_cross_junction_v1.stl"><code>maze_piece_cross_junction_v1.stl</code></a></td><td>N + E + S + W</td><td>Join all four routes</td></tr>
+          <tr data-catalog-item data-platform="x1c" data-category="walls"><td><a href="../output/variants/maze_piece_end_v1.stl"><code>maze_piece_end_v1.stl</code></a></td><td>N</td><td>Terminate a route</td></tr>
+          <tr data-catalog-item data-platform="x1c" data-category="walls"><td><a href="../output/variants/maze_piece_variants_v1.3dm"><code>maze_piece_variants_v1.3dm</code></a></td><td>All five</td><td>Edit or inspect the combined Rhino source</td></tr>
+          <tr data-catalog-item data-platform="x1c" data-category="challenge"><td><a href="../output/ramp/maze_piece_x1c_200x200_30deg_ramp_v1.stl"><code>maze_piece_x1c_200x200_30deg_ramp_v1.stl</code></a></td><td>South low / north high</td><td>30° ramp ending 2 mm above the wall top</td></tr>
+          <tr data-catalog-item data-platform="x1c" data-category="challenge"><td><a href="../output/ramp/maze_piece_x1c_30deg_ramp_v1.3dm"><code>maze_piece_x1c_30deg_ramp_v1.3dm</code></a></td><td>Ramp source</td><td>Edit or inspect the ramp geometry</td></tr>
+          <tr data-catalog-item data-platform="h2d" data-category="challenge"><td><a href="../output/challenge-ramp/maze_piece_h2d_200x300_30deg_up_down_ramp_v1.stl"><code>maze_piece_h2d_200x300_30deg_up_down_ramp_v1.stl</code></a></td><td>30° up + 30° down</td><td>Symmetric 200 × 300 ridge challenge</td></tr>
+          <tr data-catalog-item data-platform="h2d" data-category="challenge"><td><a href="../output/challenge-ramp/maze_piece_h2d_200x300_30deg_up_down_ramp_v1.3dm"><code>maze_piece_h2d_200x300_30deg_up_down_ramp_v1.3dm</code></a></td><td>Challenge source</td><td>Edit or inspect the up-and-down ramp</td></tr>
+          <tr data-catalog-item data-platform="h2d" data-category="challenge"><td><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_flat_top_30mm_v1.stl"><code>maze_piece_h2d_200x300_flat_top_30mm_v1.stl</code></a></td><td>30° + 30 mm top</td><td>Full-height hill with a stopping ledge</td></tr>
+          <tr data-catalog-item data-platform="h2d" data-category="challenge"><td><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_double_hump_30mm_rise_v1.stl"><code>maze_piece_h2d_200x300_double_hump_30mm_rise_v1.stl</code></a></td><td>Two Z40 peaks</td><td>Double-hump challenge</td></tr>
+          <tr data-catalog-item data-platform="h2d" data-category="challenge"><td><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_traction_ribs_v1.stl"><code>maze_piece_h2d_200x300_traction_ribs_v1.stl</code></a></td><td>Full ridge + 12 ribs</td><td>Extra grip and repeated obstacles</td></tr>
+          <tr data-catalog-item data-platform="h2d" data-category="challenge"><td><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_low_hill_20mm_rise_v1.stl"><code>maze_piece_h2d_200x300_low_hill_20mm_rise_v1.stl</code></a></td><td>20 mm rise</td><td>Low symmetric hill</td></tr>
+          <tr data-catalog-item data-platform="h2d" data-category="challenge"><td><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_low_hill_40mm_rise_v1.stl"><code>maze_piece_h2d_200x300_low_hill_40mm_rise_v1.stl</code></a></td><td>40 mm rise</td><td>Medium symmetric hill</td></tr>
+          <tr data-catalog-item data-platform="h2d" data-category="challenge"><td><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_low_hill_60mm_rise_v1.stl"><code>maze_piece_h2d_200x300_low_hill_60mm_rise_v1.stl</code></a></td><td>60 mm rise</td><td>Tall symmetric hill</td></tr>
+          <tr data-catalog-item data-platform="h2d" data-category="challenge"><td><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_offset_ridge_v1.stl"><code>maze_piece_h2d_200x300_offset_ridge_v1.stl</code></a></td><td>Steep + gentle faces</td><td>Asymmetric Y100 ridge</td></tr>
+          <tr data-catalog-item data-platform="h2d" data-category="challenge"><td><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_rounded_crest_r15_v1.stl"><code>maze_piece_h2d_200x300_rounded_crest_r15_v1.stl</code></a></td><td>30° + R15 crest</td><td>Smooth full-height hill</td></tr>
+          <tr data-catalog-item data-platform="h2d" data-category="challenge"><td><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_central_platform_80mm_v1.stl"><code>maze_piece_h2d_200x300_central_platform_80mm_v1.stl</code></a></td><td>30° + 80 mm top</td><td>Broad Z60 stopping platform</td></tr>
+          <tr data-catalog-item data-platform="h2d" data-category="challenge"><td><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_single_wall_ridge_v1.stl"><code>maze_piece_h2d_200x300_single_wall_ridge_v1.stl</code></a></td><td>West wall only</td><td>One exposed ridge edge</td></tr>
+          <tr data-catalog-item data-platform="h2d" data-category="challenge"><td><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_open_sides_ridge_v1.stl"><code>maze_piece_h2d_200x300_open_sides_ridge_v1.stl</code></a></td><td>No side walls</td><td>Fully exposed ridge</td></tr>
+          <tr data-catalog-item data-platform="h2d" data-category="challenge"><td><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_ramp_up_steps_down_v1.stl"><code>maze_piece_h2d_200x300_ramp_up_steps_down_v1.stl</code></a></td><td>Smooth up + steps down</td><td>Directional challenge</td></tr>
+          <tr data-catalog-item data-platform="h2d" data-category="challenge"><td><a href="../output/challenge-ramp-variants/maze_piece_h2d_200x300_challenge_variants_v1.3dm"><code>maze_piece_h2d_200x300_challenge_variants_v1.3dm</code></a></td><td>All twelve challenges</td><td>Edit or inspect the combined Rhino source</td></tr>
+          <tr data-catalog-item data-platform="h2d" data-category="platform"><td><a href="../output/h2d-platforms/maze_platform_h2d_200x300_v1.stl"><code>maze_platform_h2d_200x300_v1.stl</code></a></td><td>1 centred bay per edge</td><td>Long H2D adapter</td></tr>
+          <tr data-catalog-item data-platform="h2d" data-category="platform"><td><a href="../output/h2d-platforms/maze_platform_h2d_300x300_v1.stl"><code>maze_platform_h2d_300x300_v1.stl</code></a></td><td>1 centred bay per edge</td><td>Square H2D adapter</td></tr>
+          <tr data-catalog-item data-platform="h2d" data-category="platform"><td><a href="../output/h2d-platforms/maze_platform_h2d_compatible_v1.3dm"><code>maze_platform_h2d_compatible_v1.3dm</code></a></td><td>Both adapters</td><td>Edit or inspect the H2D platform source</td></tr>
+          <tr data-catalog-item data-platform="h2d" data-category="platform walls"><td><a href="../output/h2d-wall-variants/maze_piece_h2d_45deg_transition_v1.stl"><code>maze_piece_h2d_45deg_transition_v1.stl</code></a></td><td>200 mm to 300 mm</td><td>Wall-bearing 45° transition</td></tr>
+          <tr data-catalog-item data-platform="h2d" data-category="walls"><td><a href="../output/h2d-wall-variants/maze_piece_h2d_300x300_45deg_four_way_v1.stl"><code>maze_piece_h2d_300x300_45deg_four_way_v1.stl</code></a></td><td>Four centred 200 mm openings</td><td>Four-way X1C hub with clean 45° panels and no foot corners</td></tr>
+          <tr data-catalog-item data-platform="h2d" data-category="walls"><td><a href="../output/h2d-wall-variants/maze_piece_h2d_wall_variants_v1.3dm"><code>maze_piece_h2d_wall_variants_v1.3dm</code></a></td><td>Twelve wall pieces</td><td>Edit or inspect both five-piece sets and both 45° specials</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel" aria-labelledby="printing">
+      <p class="eyebrow">H2D printing</p>
+      <h2 id="printing">Keep the piece flat and preserve scale</h2>
+      <p>
+        Import every file at 100% scale in millimetres and place the platform flat
+        on the build plate. The 200 mm pieces fit both H2D envelopes. Orient the
+        200 × 300 adapter with its 300 mm dimension along the 320 mm bed axis. For
+        practical edge margin, use the 300 × 300 adapter in the single-nozzle
+        325 × 320 × 325 mm envelope; the dual-nozzle envelope is exactly 300 mm
+        wide and leaves no nominal side margin.
+      </p>
+      <p>
+        The connector fit remains a geometry and material calibration question even
+        on the new printer. Print a connector or edge-pocket coupon before committing
+        to several full platforms, and confirm the selected plate's excluded zones
+        and adhesion allowance in Bambu Studio before printing the 300 mm parts.
+      </p>
+      <p><a href="https://cdn1.bambulab.com/documentation/h2d/en/H2D_Laser_Full_Combo_20250305.pdf">Bambu Lab H2D official specifications</a></p>
+    </section>
+  </main>
+
+  <footer>
+    X1C geometry source: <code>output/grid_maze_platform_10mm_v1.3dm</code>. H2D adapters preserve its connector interface and wall profile. Catalog orientations use north at the top.
+  </footer>
+
+  <script>
+    (() => {
+      const search = document.getElementById('catalog-search');
+      const reset = document.getElementById('catalog-reset');
+      const count = document.getElementById('catalog-result-count');
+      const noResults = document.getElementById('catalog-no-results');
+      const items = Array.from(document.querySelectorAll('[data-catalog-item]'));
+      const buttons = Array.from(document.querySelectorAll('.filter-button'));
+      const subgroups = Array.from(document.querySelectorAll('[data-filter-subgroup]'));
+      const sections = Array.from(document.querySelectorAll('[data-filter-section]'));
+      const state = { platform: 'all', category: 'all' };
+
+      const normalize = (value) => value.toLocaleLowerCase().replace(/\s+/g, ' ').trim();
+      items.forEach((item) => { item.catalogSearchText = normalize(item.textContent); });
+
+      const hasToken = (item, key, selected) => {
+        if (selected === 'all') return true;
+        return (item.dataset[key] || '').split(/\s+/).includes(selected);
+      };
+
+      const updateContainers = () => {
+        subgroups.forEach((subgroup) => {
+          const children = Array.from(subgroup.querySelectorAll('[data-catalog-item]'));
+          subgroup.hidden = !children.some((item) => !item.hidden);
+        });
+        sections.forEach((section) => {
+          const children = Array.from(section.querySelectorAll('[data-catalog-item]'));
+          section.hidden = !children.some((item) => !item.hidden);
+        });
+      };
+
+      const updateCount = () => {
+        const visible = items.filter((item) => !item.hidden);
+        const pieceTotal = visible.filter((item) => item.matches('article')).length;
+        const fileTotal = visible.filter((item) => item.matches('tr')).length;
+        const pieceWord = pieceTotal === 1 ? 'piece' : 'pieces';
+        const fileWord = fileTotal === 1 ? 'file' : 'files';
+        count.textContent = `Showing ${pieceTotal} ${pieceWord} and ${fileTotal} ${fileWord}.`;
+        noResults.hidden = visible.length !== 0;
+      };
+
+      const applyFilters = () => {
+        const query = normalize(search.value);
+        items.forEach((item) => {
+          const matchesSearch = !query || item.catalogSearchText.includes(query);
+          const matchesPlatform = hasToken(item, 'platform', state.platform);
+          const matchesCategory = hasToken(item, 'category', state.category);
+          item.hidden = !(matchesSearch && matchesPlatform && matchesCategory);
+        });
+        updateContainers();
+        updateCount();
+      };
+
+      const selectButton = (selected) => {
+        const group = selected.dataset.filterGroup;
+        state[group] = selected.dataset.filterValue;
+        buttons
+          .filter((button) => button.dataset.filterGroup === group)
+          .forEach((button) => button.setAttribute('aria-pressed', String(button === selected)));
+        applyFilters();
+      };
+
+      buttons.forEach((button) => button.addEventListener('click', () => selectButton(button)));
+      search.addEventListener('input', applyFilters);
+      search.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && search.value) {
+          search.value = '';
+          applyFilters();
+        }
+      });
+      reset.addEventListener('click', () => {
+        search.value = '';
+        state.platform = 'all';
+        state.category = 'all';
+        buttons.forEach((button) => {
+          button.setAttribute('aria-pressed', String(button.dataset.filterValue === 'all'));
+        });
+        applyFilters();
+        search.focus();
+      });
+
+      applyFilters();
+    })();
+  </script>
+</body>
+</html>
